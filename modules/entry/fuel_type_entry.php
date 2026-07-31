@@ -23,11 +23,12 @@ function handleSave() {
     $id = intval($_POST['record_id'] ?? 0);
     $name = sanitize($_POST['fuel_name'] ?? '');
     $code = sanitize($_POST['fuel_code'] ?? '');
+    $unit = intval($_POST['unit_of_measure'] ?? 0);
     $selling = floatval($_POST['selling_rate'] ?? 0);
     $purchase = floatval($_POST['purchase_rate'] ?? 0);
     $commission = floatval($_POST['commission_rate'] ?? 0);
     $tax = floatval($_POST['tax_percent'] ?? 0);
-    $density = $_POST['density'] !== '' ? floatval($_POST['density']) : null;
+    $density = (isset($_POST['density']) && $_POST['density'] !== '') ? floatval($_POST['density']) : null;
     $color = sanitize($_POST['color_code'] ?? '');
     $remarks = sanitize($_POST['remarks'] ?? '');
     $active = intval($_POST['is_active'] ?? 1);
@@ -35,14 +36,14 @@ function handleSave() {
     if (empty($name)) jsonResponse(false, 'Fuel name is required!');
 
     if ($id > 0) {
-        $sql = "UPDATE mst_fueltype SET FuelName=?, FuelCode=?, SellingRate=?, PurchaseRate=?, CommissionRate=?, TaxPercent=?, Density=?, ColorCode=?, Remarks=?, IsActive=?, UpdatedBy=?, UpdatedAt=NOW() WHERE FuelTypeID=? AND IsDeleted=0";
-        $objQuery->inUpDel($sql, [$name, $code, $selling, $purchase, $commission, $tax, $density, $color, $remarks, $active, getUserId(), $id]);
+        $sql = "UPDATE mst_fueltype SET FuelName=?, FuelCode=?, UnitOfMeasure=?, SellingRate=?, PurchaseRate=?, CommissionRate=?, TaxPercent=?, Density=?, ColorCode=?, Remarks=?, IsActive=?, UpdatedBy=?, UpdatedAt=NOW() WHERE FuelTypeID=? AND IsDeleted=0";
+        $objQuery->inUpDel($sql, [$name, $code, $unit, $selling, $purchase, $commission, $tax, $density, $color, $remarks, $active, getUserId(), $id]);
         jsonResponse(true, 'Fuel type updated successfully!');
     } else {
         $check = $objQuery->index("SELECT FuelTypeID FROM mst_fueltype WHERE FuelName=? AND IsDeleted=0", [$name]);
         if (!empty($check)) jsonResponse(false, 'Fuel type name already exists!');
-        $sql = "INSERT INTO mst_fueltype (FuelName, FuelCode, SellingRate, PurchaseRate, CommissionRate, TaxPercent, Density, ColorCode, Remarks, CreatedBy, IsActive) VALUES (?,?,?,?,?,?,?,?,?,?,?)";
-        $objQuery->inUpDel($sql, [$name, $code, $selling, $purchase, $commission, $tax, $density, $color, $remarks, getUserId(), $active]);
+        $sql = "INSERT INTO mst_fueltype (FuelName, FuelCode, UnitOfMeasure, SellingRate, PurchaseRate, CommissionRate, TaxPercent, Density, ColorCode, Remarks, CreatedBy, IsActive) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)";
+        $objQuery->inUpDel($sql, [$name, $code, $unit, $selling, $purchase, $commission, $tax, $density, $color, $remarks, getUserId(), $active]);
         jsonResponse(true, 'Fuel type added successfully!');
     }
 }

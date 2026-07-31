@@ -120,7 +120,7 @@ if ($generate) {
     ORDER BY ft.FuelName";
     $purchaseData = $objQuery->index($sqlPurchase, [$startDate, $endDate]);
 
-    // 5. Tank Stock Summary (per tank: PrevStock, Purchase, Sales, Current, percentages)
+    // 5. Tank Stock Summary (per tank: PrevStock, Purchase, Manual Stock IN, Sales, Manual Stock OUT, Current, percentages)
     $sqlStock = "SELECT
         t.TankName,
         ft.FuelName,
@@ -134,18 +134,34 @@ if ($generate) {
               AND fp.IsActive = 1 AND fp.IsDeleted = 0
         ), 0) AS Purchase,
         COALESCE((
+            SELECT SUM(sa.Quantity)
+            FROM trx_stockadjustment sa
+            WHERE sa.TankID = t.TankID
+              AND sa.AdjustmentType = 'Stock IN'
+              AND sa.AdjustmentDate BETWEEN ? AND ?
+              AND sa.IsActive = 1 AND sa.IsDeleted = 0
+        ), 0) AS ManualStockIn,
+        COALESCE((
             SELECT SUM(nr.SaleQuantity)
             FROM trx_nozzlereading nr
             JOIN mst_nozzle n ON nr.NozzleID = n.NozzleID
             WHERE n.TankGroupID = t.TankGroupID
               AND nr.ReadingDate BETWEEN ? AND ?
               AND nr.IsActive = 1 AND nr.IsDeleted = 0
-        ), 0) AS Sales
+        ), 0) AS Sales,
+        COALESCE((
+            SELECT SUM(sa.Quantity)
+            FROM trx_stockadjustment sa
+            WHERE sa.TankID = t.TankID
+              AND sa.AdjustmentType = 'Stock OUT'
+              AND sa.AdjustmentDate BETWEEN ? AND ?
+              AND sa.IsActive = 1 AND sa.IsDeleted = 0
+        ), 0) AS ManualStockOut
     FROM mst_tank t
     JOIN mst_fueltype ft ON t.FuelTypeID = ft.FuelTypeID
     WHERE t.IsActive = 1 AND t.IsDeleted = 0
     ORDER BY t.TankName";
-    $stockData = $objQuery->index($sqlStock, [$startDate, $endDate, $startDate, $endDate]);
+    $stockData = $objQuery->index($sqlStock, [$startDate, $endDate, $startDate, $endDate, $startDate, $endDate, $startDate, $endDate]);
 }
 
 // Helper to safely get a value
@@ -449,11 +465,12 @@ function _val($arr, $key = 'TotalAmount', $default = 0) {
                             <th>SL</th>
                             <th>Tank</th>
                             <th>Fuel</th>
-                            <th>Prev Stock (L)</th>
-                            <th>Purchase (L)</th>
-                            <th>Sales (L)</th>
-                            <th>Current (L)</th>
-                            <th>Prev % Sold</th>
+                            <th>Opening (L)</th>
+                            <th>Purchase IN (L)</th>
+                            <th>Manual IN (L)</th>
+                            <th>Sales OUT (L)</th>
+                            <th>Manual OUT (L)</th>
+                            <th>Current Stock (L)</th>
                             <th>Stock %</th>
                         </tr>
                     </thead>
@@ -461,9 +478,10 @@ function _val($arr, $key = 'TotalAmount', $default = 0) {
                         <?php if (!empty($stockData)): $sl = 1; foreach ($stockData as $row): 
                             $prevStock   = (float)$row->PrevStock;
                             $purchase    = (float)$row->Purchase;
+                            $manualIn    = (float)($row->ManualStockIn ?? 0);
                             $sales       = (float)$row->Sales;
-                            $current     = $prevStock + $purchase - $sales;
-                            $prevSoldPct = $prevStock > 0 ? round(($sales / $prevStock) * 100, 1) : 0;
+                            $manualOut   = (float)($row->ManualStockOut ?? 0);
+                            $current     = $prevStock + $purchase + $manualIn - $sales - $manualOut;
                             $stockPct    = $row->Capacity > 0 ? round(($current / $row->Capacity) * 100, 1) : 0;
                         ?>
                             <tr>
@@ -471,14 +489,15 @@ function _val($arr, $key = 'TotalAmount', $default = 0) {
                                 <td><?php echo htmlspecialchars($row->TankName); ?></td>
                                 <td><?php echo htmlspecialchars($row->FuelName); ?></td>
                                 <td class="text-end"><?php echo formatCurrency($prevStock, 3); ?></td>
-                                <td class="text-end"><?php echo formatCurrency($purchase, 3); ?></td>
-                                <td class="text-end"><?php echo formatCurrency($sales, 3); ?></td>
-                                <td class="text-end"><?php echo formatCurrency($current, 3); ?></td>
-                                <td class="text-center"><?php echo $prevSoldPct; ?>%</td>
+                                <td class="text-end text-success">+<?php echo formatCurrency($purchase, 3); ?></td>
+                                <td class="text-end text-info">+<?php echo formatCurrency($manualIn, 3); ?></td>
+                                <td class="text-end text-danger">-<?php echo formatCurrency($sales, 3); ?></td>
+                                <td class="text-end text-warning">-<?php echo formatCurrency($manualOut, 3); ?></td>
+                                <td class="text-end fw-bold"><?php echo formatCurrency($current, 3); ?></td>
                                 <td class="text-center"><?php echo $stockPct; ?>%</td>
                             </tr>
                         <?php endforeach; else: ?>
-                            <tr><td colspan="9" class="text-center text-muted">No stock data found in this period.</td></tr>
+                            <tr><td colspan="10" class="text-center text-muted">No stock data found in this period.</td></tr>
                         <?php endif; ?>
                     </tbody>
                 </table>

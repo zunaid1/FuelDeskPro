@@ -41,6 +41,7 @@ $langLabel = currentLang() === 'bn' ? 'English' : 'বাংলা';
                     <li class="nav-item"><a class="nav-link small" href="<?php echo BASE_URL; ?>modules/operations/fuel_price_adjustment.php"><i class="fas fa-sliders-h"></i> <?php echo t('Fuel Price Adjustment'); ?></a></li>
                     <li class="nav-item"><a class="nav-link small" href="<?php echo BASE_URL; ?>modules/operations/supplier_payment.php"><i class="fas fa-credit-card"></i> <?php echo t('Supplier Payment'); ?></a></li>
                     <li class="nav-item"><a class="nav-link small" href="<?php echo BASE_URL; ?>modules/operations/tank_reading.php"><i class="fas fa-chart-line"></i> <?php echo t('Tank Readings'); ?></a></li>
+                    <li class="nav-item"><a class="nav-link small" href="<?php echo BASE_URL; ?>modules/operations/stock_adjustment.php"><i class="fas fa-boxes"></i> <?php echo t('Stock Adjustment'); ?></a></li>
                 </ul>
             </div>
         </li>

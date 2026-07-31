@@ -10,8 +10,14 @@ require_once __DIR__ . '/../../includes/auth_check.php';
 require_once __DIR__ . '/../../includes/header.php';
 require_once __DIR__ . '/../../includes/sidebar.php';
 
-$sql = "SELECT * FROM mst_fueltype WHERE IsDeleted = 0 ORDER BY FuelTypeID ASC";
+$sql = "SELECT ft.*, uom.UnitNameEN, uom.UnitNameBN 
+        FROM mst_fueltype ft 
+        LEFT JOIN mst_unitofmeasure uom ON ft.UnitOfMeasure = uom.Id 
+        WHERE ft.IsDeleted = 0 
+        ORDER BY ft.FuelTypeID ASC";
 $data = $objQuery->index($sql);
+
+$units = $objQuery->index("SELECT * FROM mst_unitofmeasure ORDER BY UnitNameEN ASC");
 ?>
 
 <div class="table-container">
@@ -27,6 +33,7 @@ $data = $objQuery->index($sql);
                 <th>SL</th>
                 <th>Fuel Name</th>
                 <th>Code</th>
+                <th>Unit</th>
                 <th>Selling Rate</th>
                 <th>Purchase Rate</th>
                 <th>Commission</th>
@@ -40,6 +47,7 @@ $data = $objQuery->index($sql);
                 <td><?php echo $sl++; ?></td>
                 <td><?php echo htmlspecialchars($row->FuelName); ?></td>
                 <td><?php echo htmlspecialchars($row->FuelCode ?? 'N/A'); ?></td>
+                <td><span class="badge bg-secondary"><?php echo htmlspecialchars($row->UnitNameEN ?? 'N/A'); ?></span></td>
                 <td><?php echo $currencySymbol . ' ' . number_format($row->SellingRate, 2); ?></td>
                 <td><?php echo $currencySymbol . ' ' . number_format($row->PurchaseRate, 2); ?></td>
                 <td><?php echo number_format($row->CommissionRate, 4); ?></td>
@@ -53,7 +61,7 @@ $data = $objQuery->index($sql);
                         data-id="<?php echo $row->FuelTypeID; ?>"
                         data-name="<?php echo htmlspecialchars($row->FuelName); ?>"
                         data-code="<?php echo htmlspecialchars($row->FuelCode ?? ''); ?>"
-                        data-unit="<?php echo htmlspecialchars($row->UnitOfMeasure); ?>"
+                        data-unit="<?php echo htmlspecialchars($row->UnitOfMeasure ?? ''); ?>"
                         data-selling="<?php echo $row->SellingRate; ?>"
                         data-purchase="<?php echo $row->PurchaseRate; ?>"
                         data-commission="<?php echo $row->CommissionRate; ?>"
@@ -84,13 +92,24 @@ $data = $objQuery->index($sql);
                 </div>
                 <div class="modal-body">
                     <div class="row">
-                        <div class="col-md-6 mb-3">
+                        <div class="col-md-4 mb-3">
                             <label class="form-label">Fuel Name <span class="text-danger">*</span></label>
                             <input type="text" name="fuel_name" id="fuel_name" class="form-control" required>
                         </div>
-                        <div class="col-md-6 mb-3">
+                        <div class="col-md-4 mb-3">
                             <label class="form-label">Fuel Code</label>
                             <input type="text" name="fuel_code" id="fuel_code" class="form-control">
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">Unit of Measure <span class="text-danger">*</span></label>
+                            <select name="unit_of_measure" id="unit_of_measure" class="form-select" required>
+                                <option value="">Select Unit</option>
+                                <?php foreach ($units as $u): ?>
+                                    <option value="<?php echo $u->Id; ?>">
+                                        <?php echo htmlspecialchars($u->UnitNameEN . ($u->UnitNameBN ? ' (' . $u->UnitNameBN . ')' : '')); ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
                         </div>
                     </div>
                     <div class="row">
@@ -148,6 +167,7 @@ $(document).ready(function() {
         if (!$(e.relatedTarget).hasClass('edit-btn')) {
             $('#dataForm')[0].reset();
             $('#edit_id').val('');
+            $('#unit_of_measure').val('');
             $('#modalTitle').html('<i class="fas fa-plus-circle me-2"></i>Add New Fuel Type');
         }
     });
@@ -156,6 +176,7 @@ $(document).ready(function() {
         $('#edit_id').val(b.data('id'));
         $('#fuel_name').val(b.data('name'));
         $('#fuel_code').val(b.data('code'));
+        $('#unit_of_measure').val(b.data('unit'));
         $('#selling_rate').val(b.data('selling'));
         $('#purchase_rate').val(b.data('purchase'));
         $('#commission_rate').val(b.data('commission'));

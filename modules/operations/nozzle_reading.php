@@ -56,16 +56,18 @@ $isMeterReadingReadOnly = ($isMeterReadingReadOnlySetting === 'Yes' || $isMeterR
                 <div class="col-md-4 mb-3"><label class="form-label">Nozzle <span class="text-danger">*</span></label>
                     <select name="nozzle_id" id="nozzle_id" class="form-select select2" required><option value="">Select Nozzle</option>
                     <?php foreach($nozzles as $n): ?><option value="<?php echo $n->NozzleID; ?>" data-dis="<?php echo $n->DisID; ?>"><?php echo htmlspecialchars($n->NozzleName.' ('.$n->DisName.')'); ?></option><?php endforeach; ?></select></div>
-                <div class="col-md-4 mb-3"><label class="form-label">General Reading <span class="text-danger">*</span></label><input type="number" step="0.001" name="general_reading" id="general_reading" class="form-control" required></div>
-                <div class="col-md-4 mb-3"><label class="form-label">Master Reading <span class="text-danger">*</span></label><input type="number" step="0.001" name="master_reading" id="master_reading" class="form-control" required></div>
+                <div class="col-md-4 mb-3"><label class="form-label">Selling Rate (<?php echo $currencySymbol; ?>) <span class="text-danger">*</span></label><input type="number" step="0.01" name="selling_rate" id="selling_rate" class="form-control" required></div>
+                <div class="col-md-4 mb-3"><label class="form-label">Sales Amount (<?php echo $currencySymbol; ?>)</label><input type="number" step="0.01" name="sales_amt" id="sales_amt" class="form-control" readonly></div>
             </div>
             <div class="row">
-                <div class="col-md-6 mb-3"><label class="form-label">Previous General</label><input type="number" step="0.001" name="prev_general" id="prev_general" class="form-control" <?php echo $isMeterReadingReadOnly ? 'readonly' : ''; ?>></div>
-                <div class="col-md-6 mb-3"><label class="form-label">Previous Master</label><input type="number" step="0.001" name="prev_master" id="prev_master" class="form-control" <?php echo $isMeterReadingReadOnly ? 'readonly' : ''; ?>></div>
+                <div class="col-md-4 mb-3"><label class="form-label">General Reading <span class="text-danger">*</span></label><input type="number" step="0.001" name="general_reading" id="general_reading" class="form-control" style="background-color: #e7f1ff; border: 2px solid #4169e1;" required></div>
+                <div class="col-md-4 mb-3"><label class="form-label">Master Reading <span class="text-danger">*</span></label><input type="number" step="0.001" name="master_reading" id="master_reading" class="form-control" style="background-color: #e9ecef; border: 2px solid #495057;" required></div>
+                <div class="col-md-4 mb-3"><label class="form-label">Diff. General</label><input type="number" step="0.001" name="diff_general" id="diff_general" class="form-control" style="background-color: #d0e1fd;" readonly></div>
             </div>
             <div class="row">
-                <div class="col-md-6 mb-3"><label class="form-label">Selling Rate (<?php echo $currencySymbol; ?>) <span class="text-danger">*</span></label><input type="number" step="0.01" name="selling_rate" id="selling_rate" class="form-control" required></div>
-                <div class="col-md-6 mb-3"><label class="form-label">Sales Amount (<?php echo $currencySymbol; ?>)</label><input type="number" step="0.01" name="sales_amt" id="sales_amt" class="form-control" readonly></div>
+                <div class="col-md-4 mb-3"><label class="form-label">Previous General</label><input type="number" step="0.001" name="prev_general" id="prev_general" class="form-control" style="background-color: #f0f7ff;" <?php echo $isMeterReadingReadOnly ? 'readonly' : ''; ?>></div>
+                <div class="col-md-4 mb-3"><label class="form-label">Previous Master</label><input type="number" step="0.001" name="prev_master" id="prev_master" class="form-control" style="background-color: #f8f9fa;" <?php echo $isMeterReadingReadOnly ? 'readonly' : ''; ?>></div>
+                <div class="col-md-4 mb-3"><label class="form-label">Diff. Master</label><input type="number" step="0.001" name="diff_master" id="diff_master" class="form-control" style="background-color: #dee2e6;" readonly></div>
             </div>
             <div class="mb-3"><label class="form-label">Notes</label><textarea name="notes" id="notes" class="form-control" rows="2"></textarea></div>
         </div>
@@ -75,18 +77,26 @@ $isMeterReadingReadOnly = ($isMeterReadingReadOnlySetting === 'Yes' || $isMeterR
 
 <script>
 $(document).ready(function() {
-    // Calculate sales amount from selling rate and sale quantity
-    function calculateSalesAmt() {
+    // Calculate differences and sales amount from readings and selling rate
+    function calculateDifferences() {
         var sellingRate = parseFloat($('#selling_rate').val()) || 0;
         var prevGeneral = parseFloat($('#prev_general').val()) || 0;
         var generalReading = parseFloat($('#general_reading').val()) || 0;
-        var saleQty = Math.max(0, generalReading - prevGeneral);
-        var salesAmt = (saleQty * sellingRate).toFixed(2);
+        var prevMaster = parseFloat($('#prev_master').val()) || 0;
+        var masterReading = parseFloat($('#master_reading').val()) || 0;
+
+        var diffGen = Math.max(0, generalReading - prevGeneral);
+        var diffMas = Math.max(0, masterReading - prevMaster);
+
+        $('#diff_general').val(diffGen.toFixed(3));
+        $('#diff_master').val(diffMas.toFixed(3));
+
+        var salesAmt = (diffGen * sellingRate).toFixed(2);
         $('#sales_amt').val(salesAmt);
     }
 
-    // Recalculate sales amount on relevant field changes
-    $('#selling_rate, #general_reading, #prev_general').on('input', calculateSalesAmt);
+    // Recalculate differences and sales amount on relevant field changes
+    $('#selling_rate, #general_reading, #prev_general, #master_reading, #prev_master').on('input change', calculateDifferences);
 
     // Filter nozzles by selected dispenser
     const allNozzleOptions = $('#nozzle_id').html();
@@ -130,7 +140,7 @@ $(document).ready(function() {
                         $('#prev_general').val(r.prev_general);
                         $('#prev_master').val(r.prev_master);
                         $('#selling_rate').val(r.selling_rate);
-                        calculateSalesAmt();
+                        calculateDifferences();
                     }
                 }
             });
@@ -144,6 +154,8 @@ $(document).ready(function() {
             $('#reading_date').val('<?php echo today(); ?>');
             $('#prev_general').val('');
             $('#prev_master').val('');
+            $('#diff_general').val('');
+            $('#diff_master').val('');
             $('#selling_rate').val('');
             $('#sales_amt').val('');
             $('#modalTitle').html('<i class="fas fa-plus-circle me-2"></i>Add New Reading');
@@ -162,6 +174,7 @@ $(document).ready(function() {
         $('#prev_master').val(b.data('prevmaster'));
         $('#selling_rate').val(b.data('selling'));
         $('#sales_amt').val(b.data('salesamt'));
+        calculateDifferences();
         $('#notes').val(b.data('notes'));
         $('#modalTitle').html('<i class="fas fa-edit me-2"></i>Edit Reading');
         $('#addModal').modal('show');

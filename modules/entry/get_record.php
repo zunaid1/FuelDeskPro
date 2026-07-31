@@ -28,7 +28,7 @@ $map = [
         'table' => 'mst_fueltype',
         'pk' => 'FuelTypeID',
         'fields' => ['FuelTypeID', 'FuelName', 'FuelCode', 'UnitOfMeasure', 'SellingRate', 'PurchaseRate', 'CommissionRate', 'TaxPercent', 'Density', 'ColorCode', 'Remarks', 'IsActive'],
-        'aliases' => ['FuelTypeID' => 'record_id', 'FuelName' => 'fuel_name', 'FuelCode' => 'fuel_code', 'UnitOfMeasure' => 'unit', 'SellingRate' => 'selling_rate', 'PurchaseRate' => 'purchase_rate', 'CommissionRate' => 'commission_rate', 'TaxPercent' => 'tax_percent', 'Density' => 'density', 'ColorCode' => 'color_code', 'Remarks' => 'remarks', 'IsActive' => 'is_active'],
+        'aliases' => ['FuelTypeID' => 'record_id', 'FuelName' => 'fuel_name', 'FuelCode' => 'fuel_code', 'UnitOfMeasure' => 'unit_of_measure', 'SellingRate' => 'selling_rate', 'PurchaseRate' => 'purchase_rate', 'CommissionRate' => 'commission_rate', 'TaxPercent' => 'tax_percent', 'Density' => 'density', 'ColorCode' => 'color_code', 'Remarks' => 'remarks', 'IsActive' => 'is_active'],
     ],
     'dispenser_entry.php' => [
         'table' => 'mst_dispenser',
@@ -149,6 +149,12 @@ $map = [
         'pk' => 'TankReadingID',
         'fields' => ['TankReadingID', 'ReadingDate', 'TankID', 'PreviousReadingPercent', 'CurrentReadingPercent', 'TodaySoldPercent'],
         'aliases' => ['TankReadingID' => 'record_id', 'ReadingDate' => 'reading_date', 'TankID' => 'tank_id', 'PreviousReadingPercent' => 'prev_reading', 'CurrentReadingPercent' => 'current_reading', 'TodaySoldPercent' => 'sold_percent'],
+    ],
+    'stock_adjustment_entry.php' => [
+        'table' => 'trx_stockadjustment',
+        'pk' => 'StockAdjustmentID',
+        'fields' => ['StockAdjustmentID', 'AdjustmentDate', 'TankID', 'AdjustmentType', 'Quantity', 'Reason', 'Remarks'],
+        'aliases' => ['StockAdjustmentID' => 'record_id', 'AdjustmentDate' => 'adjustment_date', 'TankID' => 'tank_id', 'AdjustmentType' => 'adjustment_type', 'Quantity' => 'quantity', 'Reason' => 'reason', 'Remarks' => 'remarks'],
     ],
 ];
 

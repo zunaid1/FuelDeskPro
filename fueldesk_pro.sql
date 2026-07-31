@@ -986,6 +986,29 @@ CREATE TABLE `trx_fuelpriceadjustment` (
 -- --------------------------------------------------------
 
 --
+-- Table structure for table `trx_stockadjustment`
+--
+
+CREATE TABLE `trx_stockadjustment` (
+  `StockAdjustmentID` int(11) NOT NULL AUTO_INCREMENT,
+  `AdjustmentDate` date NOT NULL,
+  `TankID` int(11) NOT NULL COMMENT 'Logical FK -> mst_Tank.TankID',
+  `AdjustmentType` enum('Stock IN','Stock OUT') NOT NULL,
+  `Quantity` decimal(14,3) NOT NULL DEFAULT 0.000,
+  `Reason` varchar(100) DEFAULT NULL,
+  `Remarks` varchar(255) DEFAULT NULL,
+  `CreatedBy` int(11) DEFAULT NULL,
+  `CreatedAt` datetime NOT NULL DEFAULT current_timestamp(),
+  `UpdatedBy` int(11) DEFAULT NULL,
+  `UpdatedAt` datetime NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  `IsActive` tinyint(1) NOT NULL DEFAULT 1,
+  `IsDeleted` tinyint(1) NOT NULL DEFAULT 0,
+  PRIMARY KEY (`StockAdjustmentID`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Manual Stock IN and Stock OUT adjustments';
+
+-- --------------------------------------------------------
+
+--
 -- Table structure for table `trx_fuelpurchase`
 --
 
