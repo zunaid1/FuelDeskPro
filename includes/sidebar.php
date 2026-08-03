@@ -77,9 +77,10 @@ $langLabel = currentLang() === 'bn' ? 'English' : 'বাংলা';
             </a>
             <div class="collapse" id="reportsMenu">
                 <ul class="nav flex-column ms-3">
-                    <li class="nav-item"><a class="nav-link small" href="<?php echo BASE_URL; ?>modules/operations/date_to_date_statement.php"><i class="fas fa-file-invoice-dollar"></i> <?php echo t('Date To Date All Statement'); ?></a></li>
-                    <li class="nav-item"><a class="nav-link small" href="<?php echo BASE_URL; ?>modules/operations/monthly_collection_expense_summary.php"><i class="fas fa-chart-line"></i> <?php echo t('Monthly Collection & Expense Summary'); ?></a></li>
-                    <li class="nav-item"><a class="nav-link small" href="<?php echo BASE_URL; ?>modules/operations/monthly_expense_item_wise.php"><i class="fas fa-receipt"></i> <?php echo t('Monthly Expense Summary Item Wise'); ?></a></li>
+                    <li class="nav-item"><a class="nav-link small" href="<?php echo BASE_URL; ?>modules/reports/profit_loss.php"><i class="fas fa-chart-line"></i> <?php echo t('Profit / Loss Report'); ?></a></li>
+                    <li class="nav-item"><a class="nav-link small" href="<?php echo BASE_URL; ?>modules/reports/date_to_date_statement.php"><i class="fas fa-file-invoice-dollar"></i> <?php echo t('Date To Date All Statement'); ?></a></li>
+                    <li class="nav-item"><a class="nav-link small" href="<?php echo BASE_URL; ?>modules/reports/monthly_collection_expense_summary.php"><i class="fas fa-chart-line"></i> <?php echo t('Monthly Collection & Expense Summary'); ?></a></li>
+                    <li class="nav-item"><a class="nav-link small" href="<?php echo BASE_URL; ?>modules/reports/monthly_expense_item_wise.php"><i class="fas fa-receipt"></i> <?php echo t('Monthly Expense Summary Item Wise'); ?></a></li>
                 </ul>
             </div>
         </li>
