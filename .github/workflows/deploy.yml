@@ -1,0 +1,32 @@
+name: 🚀 Auto Deploy to cPanel via FTP
+
+on:
+  push:
+    branches:
+      - main   # main branch push হলেই deploy হবে
+
+jobs:
+  ftp-deploy:
+    name: 🎯 Upload to cPanel
+    runs-on: ubuntu-latest
+    steps:
+      - name: 📦 Checkout Repo
+        uses: actions/checkout@v3
+
+      - name: 📤 Upload Files via FTP
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.4
+        with:
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          local-dir: ./          # লোকাল থেকে কোন ফোল্ডার আপলোড করবে
+          server-dir: ${{ secrets.FTP_PATH }}
+          exclude: |
+            **/.git/**
+            **/.git
+            **/.github/**
+            **/.github
+            **/.vscode/**
+            **/node_modules/**
+            **/.DS_Store
+            **/.ftp-deploy-sync-state.json
