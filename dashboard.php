@@ -217,6 +217,7 @@ $company = getCompanyInfo();
 </div>
 
 <!-- Quick Links -->
+ <!--
 <div class="row g-3">
     <div class="col-md-6">
         <div class="card border-0 shadow-sm">
@@ -259,5 +260,5 @@ $company = getCompanyInfo();
         </div>
     </div>
 </div>
-
+-->
 <?php require_once __DIR__ . '/includes/footer.php'; ?>

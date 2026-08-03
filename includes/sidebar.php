@@ -23,32 +23,7 @@ $langLabel = currentLang() === 'bn' ? 'English' : 'বাংলা';
                 <i class="fas fa-tachometer-alt"></i> <span><?php echo t('Dashboard'); ?></span>
             </a>
         </li>
-
-        <!-- Master Data Dropdown -->
-        <li class="nav-item">
-            <a class="nav-link" data-bs-toggle="collapse" href="#masterDataMenu" role="button" aria-expanded="true">
-                <i class="fas fa-database"></i> <span><?php echo t('Master Data'); ?></span>
-                <i class="fas fa-chevron-down ms-auto"></i>
-            </a>
-            <div class="collapse show" id="masterDataMenu">
-                <ul class="nav flex-column ms-3">
-                    <li class="nav-item"><a class="nav-link small" href="<?php echo BASE_URL; ?>modules/master_data/shift.php"><i class="fas fa-clock"></i> <?php echo t('Shift'); ?></a></li>
-                    <li class="nav-item"><a class="nav-link small" href="<?php echo BASE_URL; ?>modules/master_data/fuel_type.php"><i class="fas fa-oil-can"></i> <?php echo t('Fuel Type'); ?></a></li>
-                    <li class="nav-item"><a class="nav-link small" href="<?php echo BASE_URL; ?>modules/master_data/tank_group.php"><i class="fas fa-layer-group"></i> <?php echo t('Tank Group'); ?></a></li>
-                    <li class="nav-item"><a class="nav-link small" href="<?php echo BASE_URL; ?>modules/master_data/tank.php"><i class="fas fa-tint"></i> <?php echo t('Tanks'); ?></a></li>
-                    <li class="nav-item"><a class="nav-link small" href="<?php echo BASE_URL; ?>modules/master_data/dispenser.php"><i class="fas fa-gas-pump"></i> <?php echo t('Dispenser'); ?></a></li>
-                    <li class="nav-item"><a class="nav-link small" href="<?php echo BASE_URL; ?>modules/master_data/nozzle.php"><i class="fas fa-faucet"></i> <?php echo t('Nozzles'); ?></a></li>
-                    <li class="nav-item"><a class="nav-link small" href="<?php echo BASE_URL; ?>modules/master_data/supplier.php"><i class="fas fa-truck"></i> <?php echo t('Supplier'); ?></a></li>
-                    <li class="nav-item"><a class="nav-link small" href="<?php echo BASE_URL; ?>modules/master_data/shareholder.php"><i class="fas fa-users"></i> <?php echo t('Shareholders'); ?></a></li>
-                    <li class="nav-item"><a class="nav-link small" href="<?php echo BASE_URL; ?>modules/master_data/employee.php"><i class="fas fa-user-tie"></i> <?php echo t('Employee'); ?></a></li>
-                    <li class="nav-item"><a class="nav-link small" href="<?php echo BASE_URL; ?>modules/master_data/customer.php"><i class="fas fa-user-friends"></i> <?php echo t('Customer'); ?></a></li>
-                    <li class="nav-item"><a class="nav-link small" href="<?php echo BASE_URL; ?>modules/master_data/particular_group.php"><i class="fas fa-tags"></i> <?php echo t('Particular Group'); ?></a></li>
-                    <li class="nav-item"><a class="nav-link small" href="<?php echo BASE_URL; ?>modules/master_data/particular.php"><i class="fas fa-list"></i> <?php echo t('Particular'); ?></a></li>
-                </ul>
-            </div>
-        </li>
-
-        <!-- Operations Dropdown -->
+ <!-- Operations Dropdown -->
         <li class="nav-item">
             <a class="nav-link" data-bs-toggle="collapse" href="#operationsMenu" role="button" aria-expanded="true">
                 <i class="fas fa-cogs"></i> <span><?php echo t('Operations'); ?></span>
@@ -66,6 +41,30 @@ $langLabel = currentLang() === 'bn' ? 'English' : 'বাংলা';
                     <li class="nav-item"><a class="nav-link small" href="<?php echo BASE_URL; ?>modules/operations/fuel_price_adjustment.php"><i class="fas fa-sliders-h"></i> <?php echo t('Fuel Price Adjustment'); ?></a></li>
                     <li class="nav-item"><a class="nav-link small" href="<?php echo BASE_URL; ?>modules/operations/supplier_payment.php"><i class="fas fa-credit-card"></i> <?php echo t('Supplier Payment'); ?></a></li>
                     <li class="nav-item"><a class="nav-link small" href="<?php echo BASE_URL; ?>modules/operations/tank_reading.php"><i class="fas fa-chart-line"></i> <?php echo t('Tank Readings'); ?></a></li>
+                </ul>
+            </div>
+        </li>
+
+        <!-- Master Data Dropdown -->
+        <li class="nav-item">
+          <a class="nav-link collapsed" data-bs-toggle="collapse" href="#masterDataMenu" role="button" aria-expanded="false">
+                <i class="fas fa-database"></i> <span><?php echo t('Master Data'); ?></span>
+                <i class="fas fa-chevron-down ms-auto"></i>
+            </a>
+            <div class="collapse" id="masterDataMenu">
+                <ul class="nav flex-column ms-3">
+                    <li class="nav-item"><a class="nav-link small" href="<?php echo BASE_URL; ?>modules/master_data/shift.php"><i class="fas fa-clock"></i> <?php echo t('Shift'); ?></a></li>
+                    <li class="nav-item"><a class="nav-link small" href="<?php echo BASE_URL; ?>modules/master_data/fuel_type.php"><i class="fas fa-oil-can"></i> <?php echo t('Fuel Type'); ?></a></li>
+                    <li class="nav-item"><a class="nav-link small" href="<?php echo BASE_URL; ?>modules/master_data/tank_group.php"><i class="fas fa-layer-group"></i> <?php echo t('Tank Group'); ?></a></li>
+                    <li class="nav-item"><a class="nav-link small" href="<?php echo BASE_URL; ?>modules/master_data/tank.php"><i class="fas fa-tint"></i> <?php echo t('Tanks'); ?></a></li>
+                    <li class="nav-item"><a class="nav-link small" href="<?php echo BASE_URL; ?>modules/master_data/dispenser.php"><i class="fas fa-gas-pump"></i> <?php echo t('Dispenser'); ?></a></li>
+                    <li class="nav-item"><a class="nav-link small" href="<?php echo BASE_URL; ?>modules/master_data/nozzle.php"><i class="fas fa-faucet"></i> <?php echo t('Nozzles'); ?></a></li>
+                    <li class="nav-item"><a class="nav-link small" href="<?php echo BASE_URL; ?>modules/master_data/supplier.php"><i class="fas fa-truck"></i> <?php echo t('Supplier'); ?></a></li>
+                    <li class="nav-item"><a class="nav-link small" href="<?php echo BASE_URL; ?>modules/master_data/shareholder.php"><i class="fas fa-users"></i> <?php echo t('Shareholders'); ?></a></li>
+                    <li class="nav-item"><a class="nav-link small" href="<?php echo BASE_URL; ?>modules/master_data/employee.php"><i class="fas fa-user-tie"></i> <?php echo t('Employee'); ?></a></li>
+                    <li class="nav-item"><a class="nav-link small" href="<?php echo BASE_URL; ?>modules/master_data/customer.php"><i class="fas fa-user-friends"></i> <?php echo t('Customer'); ?></a></li>
+                    <li class="nav-item"><a class="nav-link small" href="<?php echo BASE_URL; ?>modules/master_data/particular_group.php"><i class="fas fa-tags"></i> <?php echo t('Particular Group'); ?></a></li>
+                    <li class="nav-item"><a class="nav-link small" href="<?php echo BASE_URL; ?>modules/master_data/particular.php"><i class="fas fa-list"></i> <?php echo t('Particular'); ?></a></li>
                 </ul>
             </div>
         </li>
