@@ -296,8 +296,8 @@ if (!empty($prevTank) && isset($prevTank[0]->CurrentReadingPercent)) {
 // 3. Daily Expenses (Joins trx_expense, mst_expenseparticular, mst_expensecategory, mst_employee)
 $sqlExpense = "SELECT 
     e.*,
-    COALESCE(ep.ParticularNameEN, emp.NameEN, e.ParticularID) AS ParticularNameEN,
-    COALESCE(ep.ParticularNameBN, emp.NameBN, emp.NameEN, e.ParticularID) AS ParticularNameBN,
+    COALESCE(ep.ParticularNameEN, emp.NameEN, sh.NameEN, e.ParticularID) AS ParticularNameEN,
+    COALESCE(ep.ParticularNameBN, emp.NameBN, sh.NameBN, emp.NameEN, sh.NameEN, e.ParticularID) AS ParticularNameBN,
     COALESCE(ec.ExpenseCategoryID, ec_sal.ExpenseCategoryID, 11) AS ExpenseCategoryID,
     COALESCE(ec.CategoryNameEN, ec_sal.CategoryNameEN, 'Salary') AS CategoryNameEN,
     COALESCE(ec.CategoryNameBN, ec_sal.CategoryNameBN, 'বেতন') AS CategoryNameBN
@@ -311,6 +311,9 @@ LEFT JOIN mst_expensecategory ec
 LEFT JOIN mst_employee emp 
     ON (e.ParticularID = emp.EmployeeId OR e.ParticularID = CAST(emp.Id AS CHAR))
     AND emp.IsDeleted = 0
+LEFT JOIN mst_shareholder sh 
+    ON (e.ParticularID = sh.ShareHolderID OR e.ParticularID = CAST(sh.Id AS CHAR))
+    AND sh.IsDeleted = 0
 LEFT JOIN mst_expensecategory ec_sal 
     ON (emp.Id IS NOT NULL OR emp.EmployeeId IS NOT NULL) 
     AND (ec_sal.ExpenseCategoryID = 11 OR ec_sal.CategoryNameEN = 'Salary')
