@@ -43,10 +43,26 @@ $isMeterReadingReadOnly = (strcasecmp($isMeterReadingReadOnlySetting, 'Yes') ===
     </table>
 </div>
 
+<style>
+#addModal .form-label {
+    font-size: 1.05rem !important;
+    font-weight: 600 !important;
+}
+#addModal .form-control, 
+#addModal .form-select {
+    font-size: 1.15rem !important;
+    font-weight: 600 !important;
+}
+#addModal .section-title {
+    font-size: 1.25rem !important;
+    font-weight: 700 !important;
+}
+</style>
+
 <div class="modal fade" id="addModal" tabindex="-1"><div class="modal-dialog modal-lg"><div class="modal-content">
     <form id="dataForm" method="POST" action="../../modules/entry/nozzle_reading_entry.php">
         <input type="hidden" name="action" value="save"><input type="hidden" name="record_id" id="edit_id" value="">
-        <div class="modal-header"><h5 class="modal-title" id="modalTitle"><i class="fas fa-plus-circle me-2"></i>Add New Reading</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+        <div class="modal-header"><h5 class="modal-title fs-5 fw-bold" id="modalTitle"><i class="fas fa-plus-circle me-2"></i>Add New Reading</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
         <div class="modal-body">
             <div class="row">
                 <div class="col-md-4 mb-3"><label class="form-label">Date <span class="text-danger">*</span></label><input type="date" name="reading_date" id="reading_date" class="form-control" required value="<?php echo today(); ?>"></div>
@@ -67,51 +83,51 @@ $isMeterReadingReadOnly = (strcasecmp($isMeterReadingReadOnlySetting, 'Yes') ===
             <div class="row">
                 <!-- General Reading Vertical Column (Royal Blue Border) -->
                 <div class="col-md-6 mb-3">
-                    <div class="card p-3 h-100" style="border: 2px solid #4169e1; border-radius: 8px; background-color: #f8faff;">
-                        <h6 class="fw-bold mb-3" style="color: #4169e1;"><i class="fas fa-globe me-1"></i> General Reading (সাধারণ রিডিং)</h6>
+                    <div class="card p-3 h-100" style="border: 2.5px solid #4169e1; border-radius: 8px; background-color: #f8faff;">
+                        <h5 class="section-title mb-3" style="color: #4169e1;"><i class="fas fa-globe me-1"></i> General Reading (সাধারণ রিডিং)</h5>
                         
                         <div class="mb-3">
-                            <label class="form-label fw-bold">General Reading <span class="text-danger">*</span></label>
+                            <label class="form-label">General Reading <span class="text-danger">*</span></label>
                             <input type="number" step="0.001" name="general_reading" id="general_reading" class="form-control" style="background-color: #e7f1ff; border: 2px solid #4169e1;" required>
                         </div>
                         
                         <div class="mb-3">
                             <label class="form-label">Previous General</label>
-                            <input type="number" step="0.001" name="prev_general" id="prev_general" class="form-control" style="background-color: #f0f7ff; border: 1px solid #cce0ff;" <?php echo $isMeterReadingReadOnly ? 'readonly' : ''; ?>>
+                            <input type="number" step="0.001" name="prev_general" id="prev_general" class="form-control" style="background-color: #f0f7ff; border: 1.5px solid #cce0ff;" <?php echo $isMeterReadingReadOnly ? 'readonly' : ''; ?>>
                         </div>
                         
                         <div class="mb-0">
-                            <label class="form-label fw-bold" style="color: #4169e1;">Diff. General</label>
-                            <input type="number" step="0.001" name="diff_general" id="diff_general" class="form-control fw-bold" style="background-color: #d0e1fd; border: 1px solid #a3c4f3;" readonly>
+                            <label class="form-label" style="color: #4169e1;">Diff. General</label>
+                            <input type="number" step="0.001" name="diff_general" id="diff_general" class="form-control" style="background-color: #d0e1fd; border: 1.5px solid #a3c4f3;" readonly>
                         </div>
                     </div>
                 </div>
 
                 <!-- Master Reading Vertical Column (Black Border) -->
                 <div class="col-md-6 mb-3">
-                    <div class="card p-3 h-100" style="border: 2px solid #000000; border-radius: 8px; background-color: #fcfcfc;">
-                        <h6 class="fw-bold text-dark mb-3"><i class="fas fa-cog me-1"></i> Master Reading (মাষ্টার রিডিং)</h6>
+                    <div class="card p-3 h-100" style="border: 2.5px solid #000000; border-radius: 8px; background-color: #fcfcfc;">
+                        <h5 class="section-title text-dark mb-3"><i class="fas fa-cog me-1"></i> Master Reading (মাষ্টার রিডিং)</h5>
                         
                         <div class="mb-3">
-                            <label class="form-label fw-bold">Master Reading <span class="text-danger">*</span></label>
+                            <label class="form-label">Master Reading <span class="text-danger">*</span></label>
                             <input type="number" step="0.001" name="master_reading" id="master_reading" class="form-control" style="background-color: #f2f2f2; border: 2px solid #000000;" required>
                         </div>
                         
                         <div class="mb-3">
                             <label class="form-label">Previous Master</label>
-                            <input type="number" step="0.001" name="prev_master" id="prev_master" class="form-control" style="background-color: #f8f9fa; border: 1px solid #dcdcdc;" <?php echo $isMeterReadingReadOnly ? 'readonly' : ''; ?>>
+                            <input type="number" step="0.001" name="prev_master" id="prev_master" class="form-control" style="background-color: #f8f9fa; border: 1.5px solid #dcdcdc;" <?php echo $isMeterReadingReadOnly ? 'readonly' : ''; ?>>
                         </div>
                         
                         <div class="mb-0">
-                            <label class="form-label fw-bold text-dark">Diff. Master</label>
-                            <input type="number" step="0.001" name="diff_master" id="diff_master" class="form-control fw-bold" style="background-color: #e2e2e2; border: 1px solid #b5b5b5;" readonly>
+                            <label class="form-label text-dark">Diff. Master</label>
+                            <input type="number" step="0.001" name="diff_master" id="diff_master" class="form-control" style="background-color: #e2e2e2; border: 1.5px solid #b5b5b5;" readonly>
                         </div>
                     </div>
                 </div>
             </div>
             <div class="mb-3"><label class="form-label">Notes</label><textarea name="notes" id="notes" class="form-control" rows="2"></textarea></div>
         </div>
-        <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-primary"><i class="fas fa-save me-1"></i> Save</button></div>
+        <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-primary fs-6 fw-bold"><i class="fas fa-save me-1"></i> Save</button></div>
     </form>
 </div></div></div>
 
