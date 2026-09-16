@@ -18,6 +18,8 @@ ensureFuelPurchaseTablesExist();
 $suppliers = $objQuery->index("SELECT SupplierID, SupplierName FROM mst_supplier WHERE IsActive=1 AND IsDeleted=0 ORDER BY SupplierName ASC");
 $fuels     = $objQuery->index("SELECT FuelTypeID, FuelName FROM mst_fueltype WHERE IsActive=1 AND IsDeleted=0 ORDER BY FuelTypeID ASC");
 $tanks     = $objQuery->index("SELECT TankID, TankName, FuelTypeID FROM mst_tank WHERE IsActive=1 AND IsDeleted=0 ORDER BY TankID ASC");
+$methods   = $objQuery->index("SELECT PaymentMethodID, MethodName FROM cfg_paymentmethod WHERE IsActive=1 AND IsDeleted=0 ORDER BY MethodName ASC");
+$bankAccounts = $objQuery->index("SELECT BankAccountID, BankName, AccountName, AccountNumber FROM mst_bankaccount WHERE IsActive=1 AND IsDeleted=0 ORDER BY BankName ASC");
 
 $sqlData = "SELECT fp.*, s.SupplierName, 
             (SELECT COUNT(*) FROM trx_purchase_details pd WHERE pd.FuelPurchaseID = fp.FuelPurchaseID AND pd.IsDeleted = 0) AS ItemCount,
@@ -113,11 +115,11 @@ $data = $objQuery->index($sqlData);
                     <div class="card mb-3 border-0 bg-light">
                         <div class="card-body py-2">
                             <div class="row g-3">
-                                <div class="col-md-3">
+                                <div class="col-md-4">
                                     <label class="form-label fw-bold">Date <span class="text-danger">*</span></label>
                                     <input type="date" name="purchase_date" id="purchase_date" class="form-control" required value="<?php echo today(); ?>">
                                 </div>
-                                <div class="col-md-3">
+                                <div class="col-md-4">
                                     <label class="form-label fw-bold">Invoice No</label>
                                     <input type="text" name="invoice_no" id="invoice_no" class="form-control" placeholder="e.g. INV-2026-001">
                                 </div>
@@ -128,14 +130,6 @@ $data = $objQuery->index($sqlData);
                                         <?php foreach($suppliers as $s): ?>
                                             <option value="<?php echo $s->SupplierID; ?>"><?php echo htmlspecialchars($s->SupplierName); ?></option>
                                         <?php endforeach; ?>
-                                    </select>
-                                </div>
-                                <div class="col-md-2">
-                                    <label class="form-label fw-bold">Payment Status</label>
-                                    <select name="payment_status" id="payment_status" class="form-select">
-                                        <option value="Due">Due</option>
-                                        <option value="Partial">Partial</option>
-                                        <option value="Paid">Paid</option>
                                     </select>
                                 </div>
                             </div>
@@ -211,6 +205,53 @@ $data = $objQuery->index($sqlData);
                             <div class="mb-2 d-flex justify-content-between align-items-center">
                                 <label class="fw-bold mb-0 text-primary fs-6">Grand Total Amount:</label>
                                 <input type="number" step="0.01" name="total_amount" id="total_amount" class="form-control text-end fw-bold fs-6 border-primary text-success" style="width: 170px;" readonly value="0.00">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Supplier Payment Section -->
+                    <div class="card border border-primary border-opacity-25 mt-3 bg-white">
+                        <div class="card-header bg-primary bg-opacity-10 py-2">
+                            <h6 class="mb-0 fw-bold text-primary">
+                                <i class="fas fa-credit-card me-2"></i>Supplier Payment (সাপ্লায়ার পেমেন্ট)
+                            </h6>
+                        </div>
+                        <div class="card-body py-2">
+                            <div class="row g-2">
+                                <div class="col-md-3">
+                                    <label class="form-label fw-bold small mb-1">Payment Status</label>
+                                    <select name="payment_status" id="payment_status" class="form-select form-select-sm fw-bold">
+                                        <option value="Due">Due (বকেয়া)</option>
+                                        <option value="Partial">Partial (আংশিক)</option>
+                                        <option value="Paid">Paid (পরিশোধ)</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label fw-bold small mb-1">Paid Amount (TK)</label>
+                                    <input type="number" step="0.01" name="paid_amount" id="paid_amount" class="form-control form-select-sm fw-bold text-success" value="0.00">
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label fw-bold small mb-1">Payment Method</label>
+                                    <select name="payment_method" id="payment_method" class="form-select form-select-sm">
+                                        <option value="">Select Method</option>
+                                        <?php foreach($methods as $m): ?>
+                                            <option value="<?php echo $m->PaymentMethodID; ?>"><?php echo htmlspecialchars($m->MethodName); ?></option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </div>
+                                <div class="col-md-3" id="bank_account_col" style="display: none;">
+                                    <label class="form-label fw-bold small mb-1">Bank Account</label>
+                                    <select name="bank_account_id" id="bank_account_id" class="form-select form-select-sm">
+                                        <option value="">Select Bank</option>
+                                        <?php foreach($bankAccounts as $ba): ?>
+                                            <option value="<?php echo $ba->BankAccountID; ?>"><?php echo htmlspecialchars($ba->BankName . ' (' . substr($ba->AccountNumber, -4) . ')'); ?></option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </div>
+                                <div class="col-md-3" id="payment_ref_col">
+                                    <label class="form-label fw-bold small mb-1">Payment Ref / Check No</label>
+                                    <input type="text" name="payment_ref" id="payment_ref" class="form-control form-select-sm" placeholder="e.g. CHK-1002 / Cash">
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -365,7 +406,52 @@ $(document).ready(function() {
         const tax = parseFloat($('#tax_amount').val()) || 0;
         const grandTotal = Math.max(0, subTotal - discAmt + tax);
         $('#total_amount').val(grandTotal.toFixed(2));
+
+        if ($('#payment_status').val() === 'Paid') {
+            $('#paid_amount').val(grandTotal.toFixed(2));
+        }
     }
+
+    // Payment method Bank field toggle
+    $('#payment_method').on('change', function() {
+        const text = $(this).find('option:selected').text().toLowerCase();
+        if (text.indexOf('bank') !== -1) {
+            $('#bank_account_col').show();
+        } else {
+            $('#bank_account_col').hide();
+            $('#bank_account_id').val('');
+        }
+    });
+
+    // Payment Status vs Paid Amount logic
+    $('#payment_status').on('change', function() {
+        const status = $(this).val();
+        const total = parseFloat($('#total_amount').val()) || 0;
+
+        if (status === 'Paid') {
+            $('#paid_amount').val(total.toFixed(2));
+        } else if (status === 'Due') {
+            $('#paid_amount').val('0.00');
+        } else if (status === 'Partial') {
+            let paid = parseFloat($('#paid_amount').val()) || 0;
+            if (paid <= 0 || paid >= total) {
+                $('#paid_amount').val('0.00').focus();
+            }
+        }
+    });
+
+    $('#paid_amount').on('input change', function() {
+        const paid = parseFloat($(this).val()) || 0;
+        const total = parseFloat($('#total_amount').val()) || 0;
+
+        if (paid <= 0) {
+            $('#payment_status').val('Due');
+        } else if (paid >= total && total > 0) {
+            $('#payment_status').val('Paid');
+        } else {
+            $('#payment_status').val('Partial');
+        }
+    });
 
     // Event Listeners for dynamic grid
     $('#btnAddRow').on('click', function() {
@@ -391,9 +477,11 @@ $(document).ready(function() {
         $('#edit_id').val('');
         $('#purchase_date').val('<?php echo today(); ?>');
         $('#payment_status').val('Due');
+        $('#paid_amount').val('0.00');
         $('#tax_amount').val('0.00');
         $('#discount_value').val('0.00');
         setDiscountMode('Fixed');
+        $('#bank_account_col').hide();
         $('#itemsTableBody').empty();
         $('#modalTitle').html('<i class="fas fa-plus-circle text-primary me-2"></i>Add New Purchase Invoice');
         addRow(); // Default 1 row
@@ -418,6 +506,10 @@ $(document).ready(function() {
                     $('#invoice_no').val(r.data.invoice_no);
                     $('#supplier_id').val(r.data.supplier_id).trigger('change');
                     $('#payment_status').val(r.data.payment_status);
+                    $('#paid_amount').val(parseFloat(r.data.paid_amount || 0).toFixed(2));
+                    $('#payment_method').val(r.data.payment_method || '').trigger('change');
+                    $('#bank_account_id').val(r.data.bank_account_id || '');
+                    $('#payment_ref').val(r.data.payment_ref || '');
                     $('#tax_amount').val(r.data.tax_amount || 0);
                     $('#discount_value').val(r.data.discount_value || 0);
                     setDiscountMode(r.data.discount_type || 'Fixed');
@@ -486,19 +578,26 @@ $(document).ready(function() {
 
                     const discTypeLabel = r.data.discount_type === 'Percentage' ? (parseFloat(r.data.discount_value || 0) + '%') : 'Flat';
                     const discAmt = parseFloat(r.data.discount_amount || 0);
+                    const grandTotalVal = parseFloat(r.data.total_amount || 0);
+                    const paidVal = parseFloat(r.data.paid_amount || 0);
+                    const dueVal = Math.max(0, grandTotalVal - paidVal);
 
                     const html = `
                         <div class="row mb-3">
                             <div class="col-md-6">
                                 <h6><strong>Invoice No:</strong> ${r.data.invoice_no || 'N/A'}</h6>
                                 <h6><strong>Purchase Date:</strong> ${r.data.purchase_date}</h6>
+                                <h6><strong>Payment Method:</strong> ${r.data.payment_method ? ('Method #' + r.data.payment_method) : 'N/A'}</h6>
+                                ${r.data.payment_ref ? `<h6><strong>Payment Ref:</strong> ${r.data.payment_ref}</h6>` : ''}
                             </div>
                             <div class="col-md-6 text-end">
-                                <h6><strong>Payment Status:</strong> <span class="badge bg-primary">${r.data.payment_status}</span></h6>
+                                <h6><strong>Payment Status:</strong> <span class="badge bg-${r.data.payment_status === 'Paid' ? 'success' : (r.data.payment_status === 'Partial' ? 'warning' : 'danger')}">${r.data.payment_status}</span></h6>
                                 <h6><strong>Sub Total:</strong> ${parseFloat(r.data.amount || 0).toFixed(2)} TK</h6>
                                 ${discAmt > 0 ? `<h6 class="text-danger"><strong>Discount (${discTypeLabel}):</strong> -${discAmt.toFixed(2)} TK</h6>` : ''}
                                 <h6><strong>Tax/Freight:</strong> +${parseFloat(r.data.tax_amount || 0).toFixed(2)} TK</h6>
-                                <h6 class="text-success fw-bold"><strong>Grand Total:</strong> ${parseFloat(r.data.total_amount || 0).toFixed(2)} TK</h6>
+                                <h6 class="text-primary fw-bold"><strong>Grand Total:</strong> ${grandTotalVal.toFixed(2)} TK</h6>
+                                <h6 class="text-success fw-bold"><strong>Paid Amount (trx_supplierpayment):</strong> ${paidVal.toFixed(2)} TK</h6>
+                                ${dueVal > 0 ? `<h6 class="text-danger fw-bold"><strong>Due Amount:</strong> ${dueVal.toFixed(2)} TK</h6>` : ''}
                             </div>
                         </div>
                         <table class="table table-bordered table-sm">
@@ -520,7 +619,7 @@ $(document).ready(function() {
                                     <td colspan="3" class="text-end">Total Summary:</td>
                                     <td class="text-end">${totalQty.toFixed(2)} L</td>
                                     <td></td>
-                                    <td class="text-end">${parseFloat(r.data.total_amount).toFixed(2)} TK</td>
+                                    <td class="text-end">${grandTotalVal.toFixed(2)} TK</td>
                                 </tr>
                             </tfoot>
                         </table>

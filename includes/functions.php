@@ -624,6 +624,31 @@ function ensureFuelPurchaseTablesExist()
         if (!in_array('DiscountAmount', $colNames)) {
             try { db()->inUpDel("ALTER TABLE `trx_fuelpurchase` ADD COLUMN `DiscountAmount` decimal(14,2) NOT NULL DEFAULT 0.00 AFTER `DiscountValue`"); } catch (\Throwable $e) {}
         }
+        if (!in_array('PaidAmount', $colNames)) {
+            try { db()->inUpDel("ALTER TABLE `trx_fuelpurchase` ADD COLUMN `PaidAmount` decimal(14,2) NOT NULL DEFAULT 0.00 AFTER `TotalAmount`"); } catch (\Throwable $e) {}
+        }
+        if (!in_array('PaymentMethodID', $colNames)) {
+            try { db()->inUpDel("ALTER TABLE `trx_fuelpurchase` ADD COLUMN `PaymentMethodID` int(11) NULL DEFAULT NULL AFTER `PaymentStatus`"); } catch (\Throwable $e) {}
+        }
+        if (!in_array('BankAccountID', $colNames)) {
+            try { db()->inUpDel("ALTER TABLE `trx_fuelpurchase` ADD COLUMN `BankAccountID` int(11) NULL DEFAULT NULL AFTER `PaymentMethodID`"); } catch (\Throwable $e) {}
+        }
+        if (!in_array('PaymentRef', $colNames)) {
+            try { db()->inUpDel("ALTER TABLE `trx_fuelpurchase` ADD COLUMN `PaymentRef` varchar(150) NULL DEFAULT NULL AFTER `BankAccountID`"); } catch (\Throwable $e) {}
+        }
+    } catch (\Throwable $e) {
+        // Safe fallback
+    }
+
+    try {
+        $spCols = db()->index("SHOW COLUMNS FROM `trx_supplierpayment`");
+        $spColNames = [];
+        foreach ($spCols as $c) {
+            $spColNames[] = is_object($c) ? ($c->Field ?? '') : ($c['Field'] ?? '');
+        }
+        if (!in_array('FuelPurchaseID', $spColNames)) {
+            try { db()->inUpDel("ALTER TABLE `trx_supplierpayment` ADD COLUMN `FuelPurchaseID` int(11) NULL DEFAULT NULL AFTER `SupplierPaymentID`"); } catch (\Throwable $e) {}
+        }
     } catch (\Throwable $e) {
         // Safe fallback
     }

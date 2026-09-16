@@ -43,6 +43,10 @@ function handleSave()
     $invoice        = sanitize($_POST['invoice_no'] ?? '');
     $supplier       = intval($_POST['supplier_id'] ?? 0);
     $status         = sanitize($_POST['payment_status'] ?? 'Due');
+    $paidAmount     = floatval($_POST['paid_amount'] ?? 0);
+    $paymentMethod  = intval($_POST['payment_method'] ?? 0);
+    $bankAccountId  = !empty($_POST['bank_account_id']) ? intval($_POST['bank_account_id']) : null;
+    $paymentRef     = sanitize($_POST['payment_ref'] ?? '');
     $remarks        = sanitize($_POST['remarks'] ?? '');
     $tax            = floatval($_POST['tax_amount'] ?? 0);
     $discountType   = sanitize($_POST['discount_type'] ?? 'Fixed');
@@ -107,6 +111,24 @@ function handleSave()
 
     $totalAmount = round(max(0, $subTotal - $discountAmount + $tax), 2);
 
+    // Sync Payment Status with Paid Amount
+    if ($paidAmount <= 0) {
+        $status = 'Due';
+        $paidAmount = 0.00;
+    } elseif ($paidAmount >= $totalAmount && $totalAmount > 0) {
+        $status = 'Paid';
+    } else {
+        $status = 'Partial';
+    }
+
+    // Fallback default payment method if paying but method not specified
+    if ($paidAmount > 0 && $paymentMethod <= 0) {
+        $defMethod = $objQuery->index("SELECT PaymentMethodID FROM cfg_paymentmethod WHERE IsActive=1 AND IsDeleted=0 ORDER BY PaymentMethodID ASC LIMIT 1");
+        if (!empty($defMethod)) {
+            $paymentMethod = intval($defMethod[0]->PaymentMethodID);
+        }
+    }
+
     try {
         $objQuery->begin();
 
@@ -121,12 +143,16 @@ function handleSave()
                 DiscountValue = ?, 
                 DiscountAmount = ?, 
                 TotalAmount = ?, 
+                PaidAmount = ?, 
+                PaymentMethodID = ?, 
+                BankAccountID = ?, 
+                PaymentRef = ?, 
                 PaymentStatus = ?, 
                 Remarks = ?, 
                 UpdatedBy = ?, 
                 UpdatedAt = NOW() 
                 WHERE FuelPurchaseID = ? AND IsDeleted = 0";
-            $objQuery->inUpDel($sqlHeader, [$date, $invoice, $supplier, $subTotal, $tax, $discountType, $discountValue, $discountAmount, $totalAmount, $status, $remarks, $userId, $id]);
+            $objQuery->inUpDel($sqlHeader, [$date, $invoice, $supplier, $subTotal, $tax, $discountType, $discountValue, $discountAmount, $totalAmount, $paidAmount, $paymentMethod, $bankAccountId, $paymentRef, $status, $remarks, $userId, $id]);
             $fuelPurchaseId = $id;
 
             // Soft-delete existing line items & stock-in records for update
@@ -134,9 +160,9 @@ function handleSave()
             $objQuery->inUpDel("UPDATE trx_stock_in SET IsDeleted = 1 WHERE ReferenceType = 'FuelPurchase' AND ReferenceID = ?", [$fuelPurchaseId]);
         } else {
             $sqlHeader = "INSERT INTO trx_fuelpurchase 
-                (PurchaseDate, InvoiceNo, SupplierID, Amount, TaxAmount, DiscountType, DiscountValue, DiscountAmount, TotalAmount, PaymentStatus, Remarks, CreatedBy) 
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
-            $objQuery->inUpDel($sqlHeader, [$date, $invoice, $supplier, $subTotal, $tax, $discountType, $discountValue, $discountAmount, $totalAmount, $status, $remarks, $userId]);
+                (PurchaseDate, InvoiceNo, SupplierID, Amount, TaxAmount, DiscountType, DiscountValue, DiscountAmount, TotalAmount, PaidAmount, PaymentMethodID, BankAccountID, PaymentRef, PaymentStatus, Remarks, CreatedBy) 
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+            $objQuery->inUpDel($sqlHeader, [$date, $invoice, $supplier, $subTotal, $tax, $discountType, $discountValue, $discountAmount, $totalAmount, $paidAmount, $paymentMethod, $bankAccountId, $paymentRef, $status, $remarks, $userId]);
             $fuelPurchaseId = intval($objQuery->getLastInsertId());
         }
 
@@ -152,6 +178,38 @@ function handleSave()
                 (StockInDate, ReferenceType, ReferenceID, ReferenceDetailID, FuelTypeID, TankID, Quantity, UnitRate, TotalValue, Remarks, CreatedBy) 
                 VALUES (?, 'FuelPurchase', ?, ?, ?, ?, ?, ?, ?, ?, ?)";
             $objQuery->inUpDel($sqlStock, [$date, $fuelPurchaseId, $detailId, $item['fuel_type_id'], $item['tank_id'], $item['quantity'], $item['rate'], $item['amount'], $remarks, $userId]);
+        }
+
+        // Manage Supplier Payment record in trx_supplierpayment
+        $refNo = !empty($paymentRef) ? $paymentRef : ($invoice ? "Inv: " . $invoice : "Purchase #" . $fuelPurchaseId);
+        $existingSp = $objQuery->index("SELECT SupplierPaymentID FROM trx_supplierpayment WHERE FuelPurchaseID = ? AND IsDeleted = 0 LIMIT 1", [$fuelPurchaseId]);
+
+        if ($paidAmount > 0) {
+            if (!empty($existingSp)) {
+                $spId = intval($existingSp[0]->SupplierPaymentID);
+                $sqlSp = "UPDATE trx_supplierpayment SET 
+                    PaymentDate = ?, 
+                    SupplierID = ?, 
+                    Amount = ?, 
+                    PaymentMethodID = ?, 
+                    BankAccountID = ?, 
+                    ReferenceNo = ?, 
+                    Remarks = ?, 
+                    UpdatedBy = ?, 
+                    UpdatedAt = NOW() 
+                    WHERE SupplierPaymentID = ? AND IsDeleted = 0";
+                $objQuery->inUpDel($sqlSp, [$date, $supplier, $paidAmount, $paymentMethod, $bankAccountId, $refNo, $remarks, $userId, $spId]);
+            } else {
+                $sqlSp = "INSERT INTO trx_supplierpayment 
+                    (FuelPurchaseID, PaymentDate, SupplierID, Amount, PaymentMethodID, BankAccountID, ReferenceNo, Remarks, CreatedBy) 
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                $objQuery->inUpDel($sqlSp, [$fuelPurchaseId, $date, $supplier, $paidAmount, $paymentMethod, $bankAccountId, $refNo, $remarks, $userId]);
+            }
+        } else {
+            if (!empty($existingSp)) {
+                $spId = intval($existingSp[0]->SupplierPaymentID);
+                $objQuery->inUpDel("UPDATE trx_supplierpayment SET IsDeleted = 1, UpdatedBy = ?, UpdatedAt = NOW() WHERE SupplierPaymentID = ?", [$userId, $spId]);
+            }
         }
 
         $objQuery->commit();
@@ -178,6 +236,7 @@ function handleDelete()
         $objQuery->inUpDel("UPDATE trx_fuelpurchase SET IsDeleted = 1, UpdatedBy = ?, UpdatedAt = NOW() WHERE FuelPurchaseID = ?", [$userId, $id]);
         $objQuery->inUpDel("UPDATE trx_purchase_details SET IsDeleted = 1 WHERE FuelPurchaseID = ?", [$id]);
         $objQuery->inUpDel("UPDATE trx_stock_in SET IsDeleted = 1 WHERE ReferenceType = 'FuelPurchase' AND ReferenceID = ?", [$id]);
+        $objQuery->inUpDel("UPDATE trx_supplierpayment SET IsDeleted = 1, UpdatedBy = ?, UpdatedAt = NOW() WHERE FuelPurchaseID = ?", [$userId, $id]);
         $objQuery->commit();
 
         jsonResponse(true, 'Purchase deleted successfully!');
