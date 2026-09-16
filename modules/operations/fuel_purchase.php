@@ -172,7 +172,11 @@ $data = $objQuery->index($sqlData);
                     </div>
 
                     <!-- Summary, Tax & Discount Section -->
-                    <div class="row justify-content-end bg-light p-2 rounded mx-0">
+                    <div class="row bg-light p-2 rounded mx-0">
+                        <div class="col-md-7 mb-2 mb-md-0">
+                            <label class="form-label fw-bold">Invoice Remarks / Notes</label>
+                            <textarea name="remarks" id="remarks" class="form-control" rows="5" placeholder="Additional details, delivery challan no, vehicle info..."></textarea>
+                        </div>
                         <div class="col-md-5">
                             <div class="mb-2 d-flex justify-content-between align-items-center">
                                 <label class="fw-bold mb-0">Sub Total Amount:</label>
@@ -208,10 +212,6 @@ $data = $objQuery->index($sqlData);
                                 <label class="fw-bold mb-0 text-primary fs-6">Grand Total Amount:</label>
                                 <input type="number" step="0.01" name="total_amount" id="total_amount" class="form-control text-end fw-bold fs-6 border-primary text-success" style="width: 170px;" readonly value="0.00">
                             </div>
-                        </div>
-                        <div class="col-md-7">
-                            <label class="form-label fw-bold">Invoice Remarks / Notes</label>
-                            <textarea name="remarks" id="remarks" class="form-control" rows="5" placeholder="Additional details, delivery challan no, vehicle info..."></textarea>
                         </div>
                     </div>
                 </div>
