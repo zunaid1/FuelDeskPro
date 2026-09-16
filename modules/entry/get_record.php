@@ -81,8 +81,8 @@ $map = [
     'shareholder_entry.php' => [
         'table' => 'mst_shareholder',
         'pk' => 'Id',
-        'fields' => ['Id', 'ShareHolderID', 'NameEN', 'NameBN', 'Mobile', 'Address', 'InvestmentAmount', 'Remarks', 'IsActive'],
-        'aliases' => ['Id' => 'record_id', 'ShareHolderID' => 'shareholder_id', 'NameEN' => 'name_en', 'NameBN' => 'name_bn', 'Mobile' => 'mobile', 'Address' => 'address', 'InvestmentAmount' => 'investment', 'Remarks' => 'remarks', 'IsActive' => 'is_active'],
+        'fields' => ['Id', 'ShareHolderID', 'ExpenseCategoryID', 'NameEN', 'NameBN', 'Mobile', 'Address', 'InvestmentAmount', 'Remarks', 'IsActive'],
+        'aliases' => ['Id' => 'record_id', 'ShareHolderID' => 'shareholder_id', 'ExpenseCategoryID' => 'expense_category_id', 'NameEN' => 'name_en', 'NameBN' => 'name_bn', 'Mobile' => 'mobile', 'Address' => 'address', 'InvestmentAmount' => 'investment', 'Remarks' => 'remarks', 'IsActive' => 'is_active'],
     ],
     'particular_group_entry.php' => [
         'table' => 'mst_expensecategory',

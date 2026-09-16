@@ -298,9 +298,9 @@ $sqlExpense = "SELECT
     e.*,
     COALESCE(ep.ParticularNameEN, emp.NameEN, sh.NameEN, e.ParticularID) AS ParticularNameEN,
     COALESCE(ep.ParticularNameBN, emp.NameBN, sh.NameBN, emp.NameEN, sh.NameEN, e.ParticularID) AS ParticularNameBN,
-    COALESCE(ec.ExpenseCategoryID, ec_sal.ExpenseCategoryID, 11) AS ExpenseCategoryID,
-    COALESCE(ec.CategoryNameEN, ec_sal.CategoryNameEN, 'Salary') AS CategoryNameEN,
-    COALESCE(ec.CategoryNameBN, ec_sal.CategoryNameBN, 'বেতন') AS CategoryNameBN
+    COALESCE(ec.ExpenseCategoryID, ec_sal.ExpenseCategoryID, ec_sh.ExpenseCategoryID, 11) AS ExpenseCategoryID,
+    COALESCE(ec.CategoryNameEN, ec_sal.CategoryNameEN, ec_sh.CategoryNameEN, 'Salary') AS CategoryNameEN,
+    COALESCE(ec.CategoryNameBN, ec_sal.CategoryNameBN, ec_sh.CategoryNameBN, 'বেতন') AS CategoryNameBN
 FROM trx_expense e
 LEFT JOIN mst_expenseparticular ep 
     ON (e.ParticularID = ep.ParticularID OR e.ParticularID = CAST(ep.ExpenseParticularID AS CHAR))
@@ -314,6 +314,9 @@ LEFT JOIN mst_employee emp
 LEFT JOIN mst_shareholder sh 
     ON (e.ParticularID = sh.ShareHolderID OR e.ParticularID = CAST(sh.Id AS CHAR))
     AND sh.IsDeleted = 0
+LEFT JOIN mst_expensecategory ec_sh 
+    ON sh.ExpenseCategoryID = ec_sh.ExpenseCategoryID 
+    AND ec_sh.IsDeleted = 0
 LEFT JOIN mst_expensecategory ec_sal 
     ON (emp.Id IS NOT NULL OR emp.EmployeeId IS NOT NULL) 
     AND (ec_sal.ExpenseCategoryID = 11 OR ec_sal.CategoryNameEN = 'Salary')
