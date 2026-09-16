@@ -135,8 +135,8 @@ $map = [
     'fuel_purchase_entry.php' => [
         'table' => 'trx_fuelpurchase',
         'pk' => 'FuelPurchaseID',
-        'fields' => ['FuelPurchaseID', 'PurchaseDate', 'InvoiceNo', 'SupplierID', 'FuelTypeID', 'TankID', 'Quantity', 'Rate', 'Amount', 'TaxAmount', 'TotalAmount', 'PaymentStatus', 'Remarks'],
-        'aliases' => ['FuelPurchaseID' => 'record_id', 'PurchaseDate' => 'purchase_date', 'InvoiceNo' => 'invoice_no', 'SupplierID' => 'supplier_id', 'FuelTypeID' => 'fuel_type_id', 'TankID' => 'tank_id', 'Quantity' => 'quantity', 'Rate' => 'rate', 'Amount' => 'amount', 'TaxAmount' => 'tax_amount', 'TotalAmount' => 'total_amount', 'PaymentStatus' => 'payment_status', 'Remarks' => 'remarks'],
+        'fields' => ['FuelPurchaseID', 'PurchaseDate', 'InvoiceNo', 'SupplierID', 'FuelTypeID', 'TankID', 'Quantity', 'Rate', 'Amount', 'TaxAmount', 'DiscountType', 'DiscountValue', 'DiscountAmount', 'TotalAmount', 'PaymentStatus', 'Remarks'],
+        'aliases' => ['FuelPurchaseID' => 'record_id', 'PurchaseDate' => 'purchase_date', 'InvoiceNo' => 'invoice_no', 'SupplierID' => 'supplier_id', 'FuelTypeID' => 'fuel_type_id', 'TankID' => 'tank_id', 'Quantity' => 'quantity', 'Rate' => 'rate', 'Amount' => 'amount', 'TaxAmount' => 'tax_amount', 'DiscountType' => 'discount_type', 'DiscountValue' => 'discount_value', 'DiscountAmount' => 'discount_amount', 'TotalAmount' => 'total_amount', 'PaymentStatus' => 'payment_status', 'Remarks' => 'remarks'],
     ],
     'fuel_price_adjustment_entry.php' => [
         'table' => 'trx_fuelpriceadjustment',

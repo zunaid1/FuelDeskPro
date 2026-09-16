@@ -38,14 +38,21 @@ function handleSave()
 {
     global $objQuery;
 
-    $id        = intval($_POST['record_id'] ?? 0);
-    $date      = sanitize($_POST['purchase_date'] ?? '');
-    $invoice   = sanitize($_POST['invoice_no'] ?? '');
-    $supplier  = intval($_POST['supplier_id'] ?? 0);
-    $status    = sanitize($_POST['payment_status'] ?? 'Due');
-    $remarks   = sanitize($_POST['remarks'] ?? '');
-    $tax       = floatval($_POST['tax_amount'] ?? 0);
-    $userId    = getUserId();
+    $id             = intval($_POST['record_id'] ?? 0);
+    $date           = sanitize($_POST['purchase_date'] ?? '');
+    $invoice        = sanitize($_POST['invoice_no'] ?? '');
+    $supplier       = intval($_POST['supplier_id'] ?? 0);
+    $status         = sanitize($_POST['payment_status'] ?? 'Due');
+    $remarks        = sanitize($_POST['remarks'] ?? '');
+    $tax            = floatval($_POST['tax_amount'] ?? 0);
+    $discountType   = sanitize($_POST['discount_type'] ?? 'Fixed');
+    $discountValue  = floatval($_POST['discount_value'] ?? 0);
+    $discountAmount = floatval($_POST['discount_amount'] ?? 0);
+    $userId         = getUserId();
+
+    if (!in_array($discountType, ['Percentage', 'Fixed'])) {
+        $discountType = 'Fixed';
+    }
 
     $fuelTypeIds = $_POST['fuel_type_id'] ?? [];
     $tankIds     = $_POST['tank_id'] ?? [];
@@ -91,7 +98,14 @@ function handleSave()
         jsonResponse(false, 'Please enter valid fuel, tank, quantity, and rate for at least one item!');
     }
 
-    $totalAmount = round($subTotal + $tax, 2);
+    // Auto calculate discount amount if percentage mode or fallback
+    if ($discountType === 'Percentage' && $discountValue > 0) {
+        $discountAmount = round($subTotal * ($discountValue / 100), 2);
+    } elseif ($discountType === 'Fixed' && $discountValue > 0 && $discountAmount <= 0) {
+        $discountAmount = round($discountValue, 2);
+    }
+
+    $totalAmount = round(max(0, $subTotal - $discountAmount + $tax), 2);
 
     try {
         $objQuery->begin();
@@ -103,13 +117,16 @@ function handleSave()
                 SupplierID = ?, 
                 Amount = ?, 
                 TaxAmount = ?, 
+                DiscountType = ?, 
+                DiscountValue = ?, 
+                DiscountAmount = ?, 
                 TotalAmount = ?, 
                 PaymentStatus = ?, 
                 Remarks = ?, 
                 UpdatedBy = ?, 
                 UpdatedAt = NOW() 
                 WHERE FuelPurchaseID = ? AND IsDeleted = 0";
-            $objQuery->inUpDel($sqlHeader, [$date, $invoice, $supplier, $subTotal, $tax, $totalAmount, $status, $remarks, $userId, $id]);
+            $objQuery->inUpDel($sqlHeader, [$date, $invoice, $supplier, $subTotal, $tax, $discountType, $discountValue, $discountAmount, $totalAmount, $status, $remarks, $userId, $id]);
             $fuelPurchaseId = $id;
 
             // Soft-delete existing line items & stock-in records for update
@@ -117,9 +134,9 @@ function handleSave()
             $objQuery->inUpDel("UPDATE trx_stock_in SET IsDeleted = 1 WHERE ReferenceType = 'FuelPurchase' AND ReferenceID = ?", [$fuelPurchaseId]);
         } else {
             $sqlHeader = "INSERT INTO trx_fuelpurchase 
-                (PurchaseDate, InvoiceNo, SupplierID, Amount, TaxAmount, TotalAmount, PaymentStatus, Remarks, CreatedBy) 
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
-            $objQuery->inUpDel($sqlHeader, [$date, $invoice, $supplier, $subTotal, $tax, $totalAmount, $status, $remarks, $userId]);
+                (PurchaseDate, InvoiceNo, SupplierID, Amount, TaxAmount, DiscountType, DiscountValue, DiscountAmount, TotalAmount, PaymentStatus, Remarks, CreatedBy) 
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+            $objQuery->inUpDel($sqlHeader, [$date, $invoice, $supplier, $subTotal, $tax, $discountType, $discountValue, $discountAmount, $totalAmount, $status, $remarks, $userId]);
             $fuelPurchaseId = intval($objQuery->getLastInsertId());
         }
 

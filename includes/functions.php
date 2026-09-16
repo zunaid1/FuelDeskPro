@@ -608,6 +608,26 @@ function ensureFuelPurchaseTablesExist()
         // Table creation fallback
     }
 
+    try {
+        $cols = db()->index("SHOW COLUMNS FROM `trx_fuelpurchase`");
+        $colNames = [];
+        foreach ($cols as $c) {
+            $colNames[] = is_object($c) ? ($c->Field ?? '') : ($c['Field'] ?? '');
+        }
+
+        if (!in_array('DiscountType', $colNames)) {
+            try { db()->inUpDel("ALTER TABLE `trx_fuelpurchase` ADD COLUMN `DiscountType` varchar(20) NOT NULL DEFAULT 'Fixed' AFTER `TaxAmount`"); } catch (\Throwable $e) {}
+        }
+        if (!in_array('DiscountValue', $colNames)) {
+            try { db()->inUpDel("ALTER TABLE `trx_fuelpurchase` ADD COLUMN `DiscountValue` decimal(14,2) NOT NULL DEFAULT 0.00 AFTER `DiscountType`"); } catch (\Throwable $e) {}
+        }
+        if (!in_array('DiscountAmount', $colNames)) {
+            try { db()->inUpDel("ALTER TABLE `trx_fuelpurchase` ADD COLUMN `DiscountAmount` decimal(14,2) NOT NULL DEFAULT 0.00 AFTER `DiscountValue`"); } catch (\Throwable $e) {}
+        }
+    } catch (\Throwable $e) {
+        // Safe fallback
+    }
+
     ensureStockAdjustmentTableExist();
 }
 

@@ -171,25 +171,47 @@ $data = $objQuery->index($sqlData);
                         </div>
                     </div>
 
-                    <!-- Summary & Tax Section -->
+                    <!-- Summary, Tax & Discount Section -->
                     <div class="row justify-content-end bg-light p-2 rounded mx-0">
-                        <div class="col-md-4">
+                        <div class="col-md-5">
                             <div class="mb-2 d-flex justify-content-between align-items-center">
                                 <label class="fw-bold mb-0">Sub Total Amount:</label>
-                                <input type="number" step="0.01" name="sub_total" id="sub_total" class="form-control text-end fw-bold" style="width: 160px;" readonly value="0.00">
+                                <input type="number" step="0.01" name="sub_total" id="sub_total" class="form-control text-end fw-bold" style="width: 170px;" readonly value="0.00">
                             </div>
+
+                            <!-- Discount Row with Toggle Control -->
+                            <div class="mb-2 d-flex justify-content-between align-items-center">
+                                <input type="hidden" name="discount_type" id="discount_type" value="Fixed">
+                                <input type="hidden" name="discount_amount" id="discount_amount" value="0.00">
+                                
+                                <div class="d-flex align-items-center me-2">
+                                    <label class="fw-bold mb-0 me-1" id="lblDiscount">Discount:</label>
+                                    <div class="btn-group btn-group-sm" role="group" id="discountToggleGroup">
+                                        <button type="button" class="btn btn-primary btn-sm px-2 py-0 fw-bold active" id="btnModeFixed" title="Discount in Taka (TK)">TK</button>
+                                        <button type="button" class="btn btn-outline-primary btn-sm px-2 py-0 fw-bold" id="btnModePercent" title="Discount in Percent (%)">%</button>
+                                    </div>
+                                </div>
+                                <div style="width: 170px;">
+                                    <input type="number" step="0.01" name="discount_value" id="discount_value" class="form-control text-end fw-bold text-danger" placeholder="0.00" value="0.00">
+                                </div>
+                            </div>
+                            <div class="mb-2 d-flex justify-content-between align-items-center text-danger small fw-bold" id="rowDiscountCalc" style="display: none;">
+                                <span>Calculated Discount:</span>
+                                <span>- <span id="lblDiscountCalc">0.00</span> TK</span>
+                            </div>
+
                             <div class="mb-2 d-flex justify-content-between align-items-center">
                                 <label class="fw-bold mb-0">Tax / Freight Charge:</label>
-                                <input type="number" step="0.01" name="tax_amount" id="tax_amount" class="form-control text-end" style="width: 160px;" value="0.00">
+                                <input type="number" step="0.01" name="tax_amount" id="tax_amount" class="form-control text-end fw-bold" style="width: 170px;" value="0.00">
                             </div>
                             <div class="mb-2 d-flex justify-content-between align-items-center">
                                 <label class="fw-bold mb-0 text-primary fs-6">Grand Total Amount:</label>
-                                <input type="number" step="0.01" name="total_amount" id="total_amount" class="form-control text-end fw-bold fs-6 border-primary" style="width: 160px;" readonly value="0.00">
+                                <input type="number" step="0.01" name="total_amount" id="total_amount" class="form-control text-end fw-bold fs-6 border-primary text-success" style="width: 170px;" readonly value="0.00">
                             </div>
                         </div>
-                        <div class="col-md-8">
+                        <div class="col-md-7">
                             <label class="form-label fw-bold">Invoice Remarks / Notes</label>
-                            <textarea name="remarks" id="remarks" class="form-control" rows="3" placeholder="Additional details, delivery challan no, vehicle info..."></textarea>
+                            <textarea name="remarks" id="remarks" class="form-control" rows="5" placeholder="Additional details, delivery challan no, vehicle info..."></textarea>
                         </div>
                     </div>
                 </div>
@@ -282,6 +304,28 @@ $(document).ready(function() {
         recalcTotals();
     }
 
+    function setDiscountMode(mode) {
+        $('#discount_type').val(mode);
+        if (mode === 'Percentage') {
+            $('#btnModePercent').addClass('active btn-primary').removeClass('btn-outline-primary');
+            $('#btnModeFixed').removeClass('active btn-primary').addClass('btn-outline-primary');
+            $('#discount_value').attr('placeholder', '0.00 (%)');
+        } else {
+            $('#btnModeFixed').addClass('active btn-primary').removeClass('btn-outline-primary');
+            $('#btnModePercent').removeClass('active btn-primary').addClass('btn-outline-primary');
+            $('#discount_value').attr('placeholder', '0.00 (TK)');
+        }
+        recalcTotals();
+    }
+
+    $('#btnModeFixed').on('click', function() {
+        setDiscountMode('Fixed');
+    });
+
+    $('#btnModePercent').on('click', function() {
+        setDiscountMode('Percentage');
+    });
+
     function recalcTotals() {
         let subTotal = 0;
         let rowCount = 0;
@@ -299,8 +343,27 @@ $(document).ready(function() {
         $('#lblItemCount').text(rowCount);
         $('#sub_total').val(subTotal.toFixed(2));
 
+        const mode = $('#discount_type').val() || 'Fixed';
+        const discVal = parseFloat($('#discount_value').val()) || 0;
+        let discAmt = 0;
+
+        if (mode === 'Percentage') {
+            discAmt = (subTotal * discVal) / 100;
+            if (discVal > 0) {
+                $('#rowDiscountCalc').show();
+                $('#lblDiscountCalc').text(discAmt.toFixed(2));
+            } else {
+                $('#rowDiscountCalc').hide();
+            }
+        } else {
+            discAmt = discVal;
+            $('#rowDiscountCalc').hide();
+        }
+
+        $('#discount_amount').val(discAmt.toFixed(2));
+
         const tax = parseFloat($('#tax_amount').val()) || 0;
-        const grandTotal = subTotal + tax;
+        const grandTotal = Math.max(0, subTotal - discAmt + tax);
         $('#total_amount').val(grandTotal.toFixed(2));
     }
 
@@ -318,7 +381,7 @@ $(document).ready(function() {
         }
     });
 
-    $(document).on('input', '.row-qty, .row-rate, #tax_amount', function() {
+    $(document).on('input change', '.row-qty, .row-rate, #tax_amount, #discount_value', function() {
         recalcTotals();
     });
 
@@ -328,6 +391,9 @@ $(document).ready(function() {
         $('#edit_id').val('');
         $('#purchase_date').val('<?php echo today(); ?>');
         $('#payment_status').val('Due');
+        $('#tax_amount').val('0.00');
+        $('#discount_value').val('0.00');
+        setDiscountMode('Fixed');
         $('#itemsTableBody').empty();
         $('#modalTitle').html('<i class="fas fa-plus-circle text-primary me-2"></i>Add New Purchase Invoice');
         addRow(); // Default 1 row
@@ -352,7 +418,9 @@ $(document).ready(function() {
                     $('#invoice_no').val(r.data.invoice_no);
                     $('#supplier_id').val(r.data.supplier_id).trigger('change');
                     $('#payment_status').val(r.data.payment_status);
-                    $('#tax_amount').val(r.data.tax_amount);
+                    $('#tax_amount').val(r.data.tax_amount || 0);
+                    $('#discount_value').val(r.data.discount_value || 0);
+                    setDiscountMode(r.data.discount_type || 'Fixed');
                     $('#remarks').val(r.data.remarks);
 
                     if (r.data.items && r.data.items.length > 0) {
@@ -416,6 +484,9 @@ $(document).ready(function() {
                         });
                     }
 
+                    const discTypeLabel = r.data.discount_type === 'Percentage' ? (parseFloat(r.data.discount_value || 0) + '%') : 'Flat';
+                    const discAmt = parseFloat(r.data.discount_amount || 0);
+
                     const html = `
                         <div class="row mb-3">
                             <div class="col-md-6">
@@ -424,7 +495,10 @@ $(document).ready(function() {
                             </div>
                             <div class="col-md-6 text-end">
                                 <h6><strong>Payment Status:</strong> <span class="badge bg-primary">${r.data.payment_status}</span></h6>
-                                <h6><strong>Tax/Freight:</strong> ${parseFloat(r.data.tax_amount || 0).toFixed(2)} TK</h6>
+                                <h6><strong>Sub Total:</strong> ${parseFloat(r.data.amount || 0).toFixed(2)} TK</h6>
+                                ${discAmt > 0 ? `<h6 class="text-danger"><strong>Discount (${discTypeLabel}):</strong> -${discAmt.toFixed(2)} TK</h6>` : ''}
+                                <h6><strong>Tax/Freight:</strong> +${parseFloat(r.data.tax_amount || 0).toFixed(2)} TK</h6>
+                                <h6 class="text-success fw-bold"><strong>Grand Total:</strong> ${parseFloat(r.data.total_amount || 0).toFixed(2)} TK</h6>
                             </div>
                         </div>
                         <table class="table table-bordered table-sm">
