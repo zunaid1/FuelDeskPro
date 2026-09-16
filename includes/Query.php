@@ -26,17 +26,27 @@ class Query
      */
     public function __construct($host = DB_HOST, $dbname = DB_NAME, $username = DB_USER, $password = DB_PASS, $charset = 'utf8mb4')
     {
-        $dsn = "mysql:host={$host};dbname={$dbname};charset={$charset}";
+        $port = defined('DB_PORT') ? DB_PORT : '3306';
+        if (strpos($host, ':') !== false) {
+            list($hostOnly, $extractedPort) = explode(':', $host, 2);
+            $host = $hostOnly;
+            if (!empty($extractedPort)) {
+                $port = $extractedPort;
+            }
+        }
+
+        $dsn = "mysql:host={$host};port={$port};dbname={$dbname};charset={$charset}";
         $options = [
             PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
             PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_OBJ,
-            PDO::ATTR_EMULATE_PREPARES   => false,
+            PDO::ATTR_EMULATE_PREPARES   => true, // Use emulate prepares to prevent driver crashes on complex subqueries/CTEs
+            PDO::MYSQL_ATTR_INIT_COMMAND => "SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci",
         ];
 
         try {
             $this->pdo = new PDO($dsn, $username, $password, $options);
         } catch (PDOException $e) {
-            die("Database Connection Failed: " . $e->getMessage());
+            die("Database Connection Failed: " . $e->getMessage() . "<br><small>Tip: Ensure MySQL service is running in XAMPP Control Panel and port/credentials in config/database.php match.</small>");
         }
     }
 

@@ -9,9 +9,14 @@ $dispensers = $objQuery->index("SELECT DisID, DisName FROM mst_dispenser WHERE I
 $nozzles = $objQuery->index("SELECT n.NozzleID, n.NozzleName, n.DisID, d.DisName FROM mst_nozzle n LEFT JOIN mst_dispenser d ON n.DisID=d.DisID WHERE n.IsActive=1 AND n.IsDeleted=0 ORDER BY n.NozzleID");
 $data = $objQuery->index("SELECT nr.*, s.ShiftName, d.DisName, n.NozzleName FROM trx_nozzlereading nr LEFT JOIN mst_shift s ON nr.ShiftID=s.ShiftID LEFT JOIN mst_dispenser d ON nr.DisID=d.DisID LEFT JOIN mst_nozzle n ON nr.NozzleID=n.NozzleID WHERE nr.IsDeleted=0 ORDER BY nr.ReadingDate DESC, nr.NozzleReadingID DESC");
 
-$isMeterReadingReadOnlySetting = getSetting('IsMeterReadingReadOnly');
-$isMeterReadingReadOnly = ($isMeterReadingReadOnlySetting === 'Yes' || $isMeterReadingReadOnlySetting === null);
+$isMeterReadingReadOnlySetting = trim(getSetting('IsMeterReadingReadOnly') ?? '');
+$isMeterReadingReadOnly = (strcasecmp($isMeterReadingReadOnlySetting, 'Yes') === 0 || strcasecmp($isMeterReadingReadOnlySetting, 'True') === 0);
 ?>
+<?php if (isStatementClosed(today())): ?>
+<div class="alert alert-danger shadow-sm border-danger text-center fw-bold fs-6 mb-3 py-2">
+    <i class="fas fa-lock me-2"></i> আজকের তারিখের (<?php echo date('d-m-Y'); ?>) হিসাবটি ইতোমধ্যে ক্লোজ করা হয়েছে
+</div>
+<?php endif; ?>
 <div class="table-container">
     <div class="table-header">
         <h5><i class="fas fa-tachometer-alt text-primary me-2"></i><?php echo t('Nozzle Meter Readings'); ?></h5>
@@ -126,14 +131,16 @@ $(document).ready(function() {
         $nozzle.select2({ theme: 'bootstrap-5', dropdownParent: $('#addModal') });
     });
 
-    // Load previous readings and selling rate when nozzle is selected
-    $('#nozzle_id').on('change', function() {
-        const nozzleId = $(this).val();
-        if (nozzleId) {
+    // Load previous readings and selling rate when nozzle or reading_date is changed
+    function loadPreviousReadings() {
+        const nozzleId = $('#nozzle_id').val();
+        const readingDate = $('#reading_date').val();
+        // Auto-fetch only when adding new reading (edit_id is empty)
+        if (nozzleId && $('#edit_id').val() === '') {
             $.ajax({
                 url: '../../modules/entry/nozzle_reading_entry.php',
                 type: 'POST',
-                data: { action: 'get_previous', nozzle_id: nozzleId },
+                data: { action: 'get_previous', nozzle_id: nozzleId, reading_date: readingDate },
                 dataType: 'json',
                 success: function(r) {
                     if (r.success) {
@@ -145,7 +152,9 @@ $(document).ready(function() {
                 }
             });
         }
-    });
+    }
+
+    $('#nozzle_id, #reading_date').on('change', loadPreviousReadings);
 
     $('#addModal').on('show.bs.modal', function(e) {
         if (!$(e.relatedTarget).hasClass('edit-btn')) {

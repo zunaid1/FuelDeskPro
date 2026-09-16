@@ -23,6 +23,7 @@ function handleSave() {
     $due = floatval($_POST['due_amount'] ?? 0);
     $remarks = sanitize($_POST['remarks'] ?? '');
     if (empty($date) || !$customer || !$fuel || $qty <= 0 || $rate <= 0) jsonResponse(false, 'Required fields missing!');
+    if (isStatementClosed($date)) jsonResponse(false, 'এই তারিখের ('.date('d-m-Y', strtotime($date)).') হিসাবটি ইতোমধ্যে ফাইনাল সাবমিট (ক্লোজ) করা হয়েছে! নতুন ডাটা সেভ বা আপডেট করা সম্ভব নয়।');
     if ($id > 0) {
         $objQuery->inUpDel("UPDATE trx_customerdue SET TxnDate=?, CustomerID=?, FuelTypeID=?, VehicleNumber=?, Quantity=?, Rate=?, TotalAmount=?, PaidAmount=?, DueAmount=?, Remarks=?, UpdatedBy=?, UpdatedAt=NOW() WHERE CustomerDueID=? AND IsDeleted=0", [$date, $customer, $fuel, $vehicle, $qty, $rate, $total, $paid, $due, $remarks, getUserId(), $id]);
         jsonResponse(true, 'Due updated successfully!');
@@ -34,6 +35,10 @@ function handleSave() {
 function handleDelete() {
     global $objQuery; $id = intval($_POST['record_id'] ?? 0);
     if ($id <= 0) jsonResponse(false, 'Invalid ID!');
+    $rec = $objQuery->index("SELECT TxnDate FROM trx_customerdue WHERE CustomerDueID=?", [$id]);
+    if (!empty($rec) && isStatementClosed($rec[0]->TxnDate)) {
+        jsonResponse(false, 'এই তারিখের ('.date('d-m-Y', strtotime($rec[0]->TxnDate)).') হিসাবটি ইতোমধ্যে ফাইনাল সাবমিট (ক্লোজ) করা হয়েছে! এই তারিখের ডাটা মোছা সম্ভব নয়।');
+    }
     $objQuery->inUpDel("UPDATE trx_customerdue SET IsDeleted=1, UpdatedBy=?, UpdatedAt=NOW() WHERE CustomerDueID=?", [getUserId(), $id]);
     jsonResponse(true, 'Due deleted successfully!');
 }

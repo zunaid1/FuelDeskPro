@@ -26,6 +26,10 @@ function handleSave() {
     if (empty($date) || !$shift || !$dis || !$nozzle || $general <= 0 || $master <= 0) {
         jsonResponse(false, 'Required fields missing!');
     }
+    if (isStatementClosed($date)) {
+        jsonResponse(false, 'এই তারিখের ('.date('d-m-Y', strtotime($date)).') হিসাবটি ইতোমধ্যে ক্লোজ করা হয়েছে!');
+    }
+
 
     // Retrieve rates from mst_fueltype via mst_nozzle
     $sellingRate = 0.00;
@@ -96,12 +100,18 @@ function handleSave() {
 function handleDelete() {
     global $objQuery; $id = intval($_POST['record_id'] ?? 0);
     if ($id <= 0) jsonResponse(false, 'Invalid ID!');
+    $rec = $objQuery->index("SELECT ReadingDate FROM trx_nozzlereading WHERE NozzleReadingID=?", [$id]);
+    if (!empty($rec) && isStatementClosed($rec[0]->ReadingDate)) {
+        jsonResponse(false, 'এই তারিখের ('.date('d-m-Y', strtotime($rec[0]->ReadingDate)).') হিসাবটি ইতোমধ্যে ফাইনাল সাবমিট (ক্লোজ) করা হয়েছে! এই তারিখের ডাটা মোছা সম্ভব নয়।');
+    }
     $objQuery->inUpDel("UPDATE trx_nozzlereading SET IsDeleted=1, UpdatedBy=?, UpdatedAt=NOW() WHERE NozzleReadingID=?", [getUserId(), $id]);
     jsonResponse(true, 'Reading deleted successfully!');
 }
 function getPreviousReading() {
     global $objQuery;
     $nozzleId = intval($_POST['nozzle_id'] ?? 0);
+    $readingDate = sanitize($_POST['reading_date'] ?? '');
+    
     if ($nozzleId <= 0) jsonResponse(false, 'Invalid nozzle!');
 
     // Get default selling rate from fuel type via nozzle
@@ -116,15 +126,73 @@ function getPreviousReading() {
         $sellingRate = floatval($fuelData[0]->SellingRate);
     }
 
-    $last = $objQuery->index("SELECT GeneralReading, MasterReading FROM trx_nozzlereading WHERE NozzleID=? AND IsDeleted=0 ORDER BY ReadingDate DESC, NozzleReadingID DESC LIMIT 1", [$nozzleId]);
-    if (!empty($last)) {
-        jsonResponse(true, '', ['prev_general' => $last[0]->GeneralReading, 'prev_master' => $last[0]->MasterReading, 'selling_rate' => $sellingRate]);
-    } else {
-        $nozzle = $objQuery->index("SELECT OpeningGeneral, OpeningMaster FROM mst_nozzle WHERE NozzleID=?", [$nozzleId]);
-        if (!empty($nozzle)) {
-            jsonResponse(true, '', ['prev_general' => $nozzle[0]->OpeningGeneral, 'prev_master' => $nozzle[0]->OpeningMaster, 'selling_rate' => $sellingRate]);
+    $prevGeneral = 0;
+    $prevMaster  = 0;
+    $found = false;
+
+    if (!empty($readingDate)) {
+        // 1. Calculate 1 day prior date
+        $targetPrevDate = date('Y-m-d', strtotime($readingDate . ' -1 day'));
+
+        // 2. Check if reading exists for exact previous day
+        $exactPrev = $objQuery->index(
+            "SELECT GeneralReading, MasterReading 
+             FROM trx_nozzlereading 
+             WHERE NozzleID = ? AND ReadingDate = ? AND IsDeleted = 0 
+             ORDER BY NozzleReadingID DESC LIMIT 1",
+            [$nozzleId, $targetPrevDate]
+        );
+
+        if (!empty($exactPrev)) {
+            $prevGeneral = $exactPrev[0]->GeneralReading;
+            $prevMaster  = $exactPrev[0]->MasterReading;
+            $found = true;
         } else {
-            jsonResponse(true, '', ['prev_general' => 0, 'prev_master' => 0, 'selling_rate' => $sellingRate]);
+            // 3. If exact previous day reading not found, find max date reading prior to selected date
+            $priorLatest = $objQuery->index(
+                "SELECT GeneralReading, MasterReading 
+                 FROM trx_nozzlereading 
+                 WHERE NozzleID = ? AND ReadingDate < ? AND IsDeleted = 0 
+                 ORDER BY ReadingDate DESC, NozzleReadingID DESC LIMIT 1",
+                [$nozzleId, $readingDate]
+            );
+
+            if (!empty($priorLatest)) {
+                $prevGeneral = $priorLatest[0]->GeneralReading;
+                $prevMaster  = $priorLatest[0]->MasterReading;
+                $found = true;
+            }
         }
     }
+
+    // 4. Fallback to latest overall reading if not yet found
+    if (!$found) {
+        $lastOverall = $objQuery->index(
+            "SELECT GeneralReading, MasterReading 
+             FROM trx_nozzlereading 
+             WHERE NozzleID = ? AND IsDeleted = 0 
+             ORDER BY ReadingDate DESC, NozzleReadingID DESC LIMIT 1",
+            [$nozzleId]
+        );
+        if (!empty($lastOverall)) {
+            $prevGeneral = $lastOverall[0]->GeneralReading;
+            $prevMaster  = $lastOverall[0]->MasterReading;
+            $found = true;
+        }
+    }
+
+    // 5. Final fallback to Opening Readings from master data table
+    if (!$found) {
+        $nozzle = $objQuery->index("SELECT OpeningGeneral, OpeningMaster FROM mst_nozzle WHERE NozzleID = ?", [$nozzleId]);
+        if (!empty($nozzle)) {
+            $prevGeneral = $nozzle[0]->OpeningGeneral;
+            $prevMaster  = $nozzle[0]->OpeningMaster;
+        }
+    }
+
+    jsonResponse(true, '', [
+        'prev_general' => $prevGeneral,
+        'prev_master'  => $prevMaster,
+        'selling_rate' => $sellingRate
+    ]);
 }

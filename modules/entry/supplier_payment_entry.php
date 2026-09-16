@@ -16,14 +16,15 @@ function handleSave() {
     $supplier = intval($_POST['supplier_id'] ?? 0);
     $amount = floatval($_POST['amount'] ?? 0);
     $method = intval($_POST['payment_method'] ?? 0);
+    $bank_account_id = !empty($_POST['bank_account_id']) ? intval($_POST['bank_account_id']) : null;
     $ref = sanitize($_POST['reference_no'] ?? '');
     $remarks = sanitize($_POST['remarks'] ?? '');
     if (empty($date) || !$supplier || $amount <= 0 || !$method) jsonResponse(false, 'Required fields missing!');
     if ($id > 0) {
-        $objQuery->inUpDel("UPDATE trx_supplierpayment SET PaymentDate=?, SupplierID=?, Amount=?, PaymentMethodID=?, ReferenceNo=?, Remarks=?, UpdatedBy=?, UpdatedAt=NOW() WHERE SupplierPaymentID=? AND IsDeleted=0", [$date, $supplier, $amount, $method, $ref, $remarks, getUserId(), $id]);
+        $objQuery->inUpDel("UPDATE trx_supplierpayment SET PaymentDate=?, SupplierID=?, Amount=?, PaymentMethodID=?, BankAccountID=?, ReferenceNo=?, Remarks=?, UpdatedBy=?, UpdatedAt=NOW() WHERE SupplierPaymentID=? AND IsDeleted=0", [$date, $supplier, $amount, $method, $bank_account_id, $ref, $remarks, getUserId(), $id]);
         jsonResponse(true, 'Payment updated successfully!');
     } else {
-        $objQuery->inUpDel("INSERT INTO trx_supplierpayment (PaymentDate, SupplierID, Amount, PaymentMethodID, ReferenceNo, Remarks, CreatedBy) VALUES (?,?,?,?,?,?,?)", [$date, $supplier, $amount, $method, $ref, $remarks, getUserId()]);
+        $objQuery->inUpDel("INSERT INTO trx_supplierpayment (PaymentDate, SupplierID, Amount, PaymentMethodID, BankAccountID, ReferenceNo, Remarks, CreatedBy) VALUES (?,?,?,?,?,?,?,?)", [$date, $supplier, $amount, $method, $bank_account_id, $ref, $remarks, getUserId()]);
         jsonResponse(true, 'Payment added successfully!');
     }
 }

@@ -955,7 +955,7 @@ CREATE TABLE `trx_expense` (
   `UpdatedAt` datetime DEFAULT current_timestamp() ON UPDATE current_timestamp(),
   `IsActive` tinyint(1) DEFAULT 1,
   `IsDeleted` tinyint(1) DEFAULT 0
-) ;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
 
@@ -1033,6 +1033,87 @@ CREATE TABLE `trx_fuelpurchase` (
   `IsActive` tinyint(1) NOT NULL DEFAULT 1,
   `IsDeleted` tinyint(1) NOT NULL DEFAULT 0
 ) ;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `trx_purchase_details`
+--
+
+CREATE TABLE `trx_purchase_details` (
+  `PurchaseDetailID` int(11) NOT NULL AUTO_INCREMENT,
+  `FuelPurchaseID` int(11) NOT NULL,
+  `FuelTypeID` int(11) NOT NULL,
+  `TankID` int(11) NOT NULL,
+  `Quantity` decimal(14,3) NOT NULL DEFAULT 0.000,
+  `Rate` decimal(14,2) NOT NULL DEFAULT 0.00,
+  `Amount` decimal(14,2) NOT NULL DEFAULT 0.00,
+  `Remarks` varchar(255) DEFAULT NULL,
+  `IsActive` tinyint(1) NOT NULL DEFAULT 1,
+  `IsDeleted` tinyint(1) NOT NULL DEFAULT 0,
+  PRIMARY KEY (`PurchaseDetailID`),
+  KEY `idx_fuel_purchase` (`FuelPurchaseID`),
+  KEY `idx_fuel_type` (`FuelTypeID`),
+  KEY `idx_tank` (`TankID`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `trx_stock_in`
+--
+
+CREATE TABLE `trx_stock_in` (
+  `StockInID` int(11) NOT NULL AUTO_INCREMENT,
+  `StockInDate` date NOT NULL,
+  `ReferenceType` varchar(50) NOT NULL DEFAULT 'FuelPurchase',
+  `ReferenceID` int(11) NOT NULL,
+  `ReferenceDetailID` int(11) DEFAULT NULL,
+  `FuelTypeID` int(11) NOT NULL,
+  `TankID` int(11) NOT NULL,
+  `Quantity` decimal(14,3) NOT NULL DEFAULT 0.000,
+  `UnitRate` decimal(14,2) NOT NULL DEFAULT 0.00,
+  `TotalValue` decimal(14,2) NOT NULL DEFAULT 0.00,
+  `Remarks` varchar(255) DEFAULT NULL,
+  `CreatedBy` int(11) DEFAULT NULL,
+  `CreatedAt` datetime NOT NULL DEFAULT current_timestamp(),
+  `UpdatedBy` int(11) DEFAULT NULL,
+  `UpdatedAt` datetime NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  `IsActive` tinyint(1) NOT NULL DEFAULT 1,
+  `IsDeleted` tinyint(1) NOT NULL DEFAULT 0,
+  PRIMARY KEY (`StockInID`),
+  KEY `idx_ref` (`ReferenceType`, `ReferenceID`),
+  KEY `idx_fuel_tank` (`FuelTypeID`, `TankID`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `trx_stockadjustment`
+--
+
+CREATE TABLE `trx_stockadjustment` (
+  `AdjustmentID` int(11) NOT NULL AUTO_INCREMENT,
+  `AdjustmentDate` date NOT NULL,
+  `AdjustmentType` enum('ADD','DEDUCT') NOT NULL DEFAULT 'ADD',
+  `FuelTypeID` int(11) NOT NULL,
+  `TankID` int(11) NOT NULL,
+  `Quantity` decimal(14,3) NOT NULL DEFAULT 0.000,
+  `UnitRate` decimal(14,2) NOT NULL DEFAULT 0.00,
+  `TotalValue` decimal(14,2) NOT NULL DEFAULT 0.00,
+  `AdjustmentReason` varchar(100) DEFAULT NULL,
+  `Remarks` varchar(255) DEFAULT NULL,
+  `CreatedBy` int(11) DEFAULT NULL,
+  `CreatedAt` datetime NOT NULL DEFAULT current_timestamp(),
+  `UpdatedBy` int(11) DEFAULT NULL,
+  `UpdatedAt` datetime NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  `IsActive` tinyint(1) NOT NULL DEFAULT 1,
+  `IsDeleted` tinyint(1) NOT NULL DEFAULT 0,
+  PRIMARY KEY (`AdjustmentID`),
+  KEY `idx_adj_date` (`AdjustmentDate`),
+  KEY `idx_fuel_tank` (`FuelTypeID`, `TankID`),
+  KEY `idx_adj_type` (`AdjustmentType`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
 
@@ -1710,6 +1791,36 @@ ALTER TABLE `trx_tankdip`
 --
 ALTER TABLE `trx_tankreading`
   MODIFY `TankReadingID` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- Table structure for table `mst_bankaccount`
+--
+CREATE TABLE IF NOT EXISTS `mst_bankaccount` (
+  `BankAccountID` int(11) NOT NULL AUTO_INCREMENT,
+  `BankName` varchar(150) NOT NULL,
+  `BranchName` varchar(150) DEFAULT NULL,
+  `AccountName` varchar(150) NOT NULL,
+  `AccountNumber` varchar(50) NOT NULL,
+  `AccountType` varchar(50) DEFAULT 'Current',
+  `RoutingNumber` varchar(50) DEFAULT NULL,
+  `OpeningBalance` decimal(15,2) NOT NULL DEFAULT 0.00,
+  `OpeningDate` date DEFAULT NULL,
+  `CurrentBalance` decimal(15,2) NOT NULL DEFAULT 0.00,
+  `IsDefault` tinyint(1) DEFAULT 0,
+  `CreatedBy` int(11) DEFAULT NULL,
+  `CreatedAt` datetime DEFAULT current_timestamp(),
+  `UpdatedBy` int(11) DEFAULT NULL,
+  `UpdatedAt` datetime DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  `IsActive` tinyint(1) DEFAULT 1,
+  `IsDeleted` tinyint(1) DEFAULT 0,
+  PRIMARY KEY (`BankAccountID`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Add BankAccountID column to trx_cashcollection if not exists
+--
+ALTER TABLE `trx_cashcollection` ADD COLUMN IF NOT EXISTS `BankAccountID` INT(11) NULL DEFAULT NULL AFTER `CollectedPersonID`;
+
 COMMIT;
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;

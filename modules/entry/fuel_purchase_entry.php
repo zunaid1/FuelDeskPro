@@ -1,41 +1,171 @@
 <?php
+/**
+ * FuelDeskPro - Multi-Item Fuel Purchase Entry Processor
+ * 
+ * Handles multi-item purchase transactions, updating trx_fuelpurchase,
+ * trx_purchase_details, and trx_stock_in.
+ * 
+ * @package FuelDeskPro
+ */
+
 require_once __DIR__ . '/../../config/database.php';
 require_once __DIR__ . '/../../includes/functions.php';
-if (session_status() === PHP_SESSION_NONE) session_start();
-if (!isset($_SESSION['user_id'])) jsonResponse(false, 'Authentication required!');
-$action = $_POST['action'] ?? '';
-switch ($action) {
-    case 'save': handleSave(); break;
-    case 'delete': handleDelete(); break;
-    default: jsonResponse(false, 'Invalid action!');
+
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
 }
-function handleSave() {
+
+if (!isset($_SESSION['user_id'])) {
+    jsonResponse(false, 'Authentication required!');
+}
+
+ensureFuelPurchaseTablesExist();
+
+$action = $_POST['action'] ?? '';
+
+switch ($action) {
+    case 'save':
+        handleSave();
+        break;
+    case 'delete':
+        handleDelete();
+        break;
+    default:
+        jsonResponse(false, 'Invalid action!');
+}
+
+function handleSave()
+{
     global $objQuery;
-    $id = intval($_POST['record_id'] ?? 0);
-    $date = $_POST['purchase_date'] ?? '';
-    $invoice = sanitize($_POST['invoice_no'] ?? '');
-    $supplier = intval($_POST['supplier_id'] ?? 0);
-    $fuel = intval($_POST['fuel_type_id'] ?? 0);
-    $tank = intval($_POST['tank_id'] ?? 0);
-    $qty = floatval($_POST['quantity'] ?? 0);
-    $rate = floatval($_POST['rate'] ?? 0);
-    $amount = floatval($_POST['amount'] ?? 0);
-    $tax = floatval($_POST['tax_amount'] ?? 0);
-    $total = floatval($_POST['total_amount'] ?? 0);
-    $status = $_POST['payment_status'] ?? 'Due';
-    $remarks = sanitize($_POST['remarks'] ?? '');
-    if (empty($date) || !$supplier || !$fuel || !$tank || $qty <= 0 || $rate <= 0) jsonResponse(false, 'Required fields missing!');
-    if ($id > 0) {
-        $objQuery->inUpDel("UPDATE trx_fuelpurchase SET PurchaseDate=?, InvoiceNo=?, SupplierID=?, FuelTypeID=?, TankID=?, Quantity=?, Rate=?, Amount=?, TaxAmount=?, TotalAmount=?, PaymentStatus=?, Remarks=?, UpdatedBy=?, UpdatedAt=NOW() WHERE FuelPurchaseID=? AND IsDeleted=0", [$date, $invoice, $supplier, $fuel, $tank, $qty, $rate, $amount, $tax, $total, $status, $remarks, getUserId(), $id]);
-        jsonResponse(true, 'Purchase updated successfully!');
-    } else {
-        $objQuery->inUpDel("INSERT INTO trx_fuelpurchase (PurchaseDate, InvoiceNo, SupplierID, FuelTypeID, TankID, Quantity, Rate, Amount, TaxAmount, TotalAmount, PaymentStatus, Remarks, CreatedBy) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)", [$date, $invoice, $supplier, $fuel, $tank, $qty, $rate, $amount, $tax, $total, $status, $remarks, getUserId()]);
-        jsonResponse(true, 'Purchase added successfully!');
+
+    $id        = intval($_POST['record_id'] ?? 0);
+    $date      = sanitize($_POST['purchase_date'] ?? '');
+    $invoice   = sanitize($_POST['invoice_no'] ?? '');
+    $supplier  = intval($_POST['supplier_id'] ?? 0);
+    $status    = sanitize($_POST['payment_status'] ?? 'Due');
+    $remarks   = sanitize($_POST['remarks'] ?? '');
+    $tax       = floatval($_POST['tax_amount'] ?? 0);
+    $userId    = getUserId();
+
+    $fuelTypeIds = $_POST['fuel_type_id'] ?? [];
+    $tankIds     = $_POST['tank_id'] ?? [];
+    $quantities  = $_POST['quantity'] ?? [];
+    $rates       = $_POST['rate'] ?? [];
+    $amounts     = $_POST['amount'] ?? [];
+
+    if (empty($date) || !$supplier) {
+        jsonResponse(false, 'Date and Supplier are required!');
+    }
+
+    if (!is_array($fuelTypeIds) || empty($fuelTypeIds)) {
+        jsonResponse(false, 'Please add at least one line item!');
+    }
+
+    $validItems = [];
+    $subTotal = 0;
+
+    for ($i = 0; $i < count($fuelTypeIds); $i++) {
+        $fId  = intval($fuelTypeIds[$i] ?? 0);
+        $tId  = intval($tankIds[$i] ?? 0);
+        $qty  = floatval($quantities[$i] ?? 0);
+        $rate = floatval($rates[$i] ?? 0);
+        $amt  = floatval($amounts[$i] ?? 0);
+
+        if ($amt <= 0 && $qty > 0 && $rate > 0) {
+            $amt = round($qty * $rate, 2);
+        }
+
+        if ($fId > 0 && $tId > 0 && $qty > 0 && $rate > 0) {
+            $subTotal += $amt;
+            $validItems[] = [
+                'fuel_type_id' => $fId,
+                'tank_id'      => $tId,
+                'quantity'     => $qty,
+                'rate'         => $rate,
+                'amount'       => $amt
+            ];
+        }
+    }
+
+    if (empty($validItems)) {
+        jsonResponse(false, 'Please enter valid fuel, tank, quantity, and rate for at least one item!');
+    }
+
+    $totalAmount = round($subTotal + $tax, 2);
+
+    try {
+        $objQuery->begin();
+
+        if ($id > 0) {
+            $sqlHeader = "UPDATE trx_fuelpurchase SET 
+                PurchaseDate = ?, 
+                InvoiceNo = ?, 
+                SupplierID = ?, 
+                Amount = ?, 
+                TaxAmount = ?, 
+                TotalAmount = ?, 
+                PaymentStatus = ?, 
+                Remarks = ?, 
+                UpdatedBy = ?, 
+                UpdatedAt = NOW() 
+                WHERE FuelPurchaseID = ? AND IsDeleted = 0";
+            $objQuery->inUpDel($sqlHeader, [$date, $invoice, $supplier, $subTotal, $tax, $totalAmount, $status, $remarks, $userId, $id]);
+            $fuelPurchaseId = $id;
+
+            // Soft-delete existing line items & stock-in records for update
+            $objQuery->inUpDel("UPDATE trx_purchase_details SET IsDeleted = 1 WHERE FuelPurchaseID = ?", [$fuelPurchaseId]);
+            $objQuery->inUpDel("UPDATE trx_stock_in SET IsDeleted = 1 WHERE ReferenceType = 'FuelPurchase' AND ReferenceID = ?", [$fuelPurchaseId]);
+        } else {
+            $sqlHeader = "INSERT INTO trx_fuelpurchase 
+                (PurchaseDate, InvoiceNo, SupplierID, Amount, TaxAmount, TotalAmount, PaymentStatus, Remarks, CreatedBy) 
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
+            $objQuery->inUpDel($sqlHeader, [$date, $invoice, $supplier, $subTotal, $tax, $totalAmount, $status, $remarks, $userId]);
+            $fuelPurchaseId = intval($objQuery->getLastInsertId());
+        }
+
+        // Insert line items & stock receiving records
+        foreach ($validItems as $item) {
+            $sqlDetail = "INSERT INTO trx_purchase_details 
+                (FuelPurchaseID, FuelTypeID, TankID, Quantity, Rate, Amount) 
+                VALUES (?, ?, ?, ?, ?, ?)";
+            $objQuery->inUpDel($sqlDetail, [$fuelPurchaseId, $item['fuel_type_id'], $item['tank_id'], $item['quantity'], $item['rate'], $item['amount']]);
+            $detailId = intval($objQuery->getLastInsertId());
+
+            $sqlStock = "INSERT INTO trx_stock_in 
+                (StockInDate, ReferenceType, ReferenceID, ReferenceDetailID, FuelTypeID, TankID, Quantity, UnitRate, TotalValue, Remarks, CreatedBy) 
+                VALUES (?, 'FuelPurchase', ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+            $objQuery->inUpDel($sqlStock, [$date, $fuelPurchaseId, $detailId, $item['fuel_type_id'], $item['tank_id'], $item['quantity'], $item['rate'], $item['amount'], $remarks, $userId]);
+        }
+
+        $objQuery->commit();
+        jsonResponse(true, $id > 0 ? 'Purchase updated successfully!' : 'Purchase saved successfully!');
+    } catch (\Throwable $e) {
+        $objQuery->rollback();
+        jsonResponse(false, 'Database Error: ' . $e->getMessage());
     }
 }
-function handleDelete() {
-    global $objQuery; $id = intval($_POST['record_id'] ?? 0);
-    if ($id <= 0) jsonResponse(false, 'Invalid ID!');
-    $objQuery->inUpDel("UPDATE trx_fuelpurchase SET IsDeleted=1, UpdatedBy=?, UpdatedAt=NOW() WHERE FuelPurchaseID=?", [getUserId(), $id]);
-    jsonResponse(true, 'Purchase deleted successfully!');
+
+function handleDelete()
+{
+    global $objQuery;
+
+    $id = intval($_POST['record_id'] ?? 0);
+    if ($id <= 0) {
+        jsonResponse(false, 'Invalid Purchase ID!');
+    }
+
+    $userId = getUserId();
+
+    try {
+        $objQuery->begin();
+        $objQuery->inUpDel("UPDATE trx_fuelpurchase SET IsDeleted = 1, UpdatedBy = ?, UpdatedAt = NOW() WHERE FuelPurchaseID = ?", [$userId, $id]);
+        $objQuery->inUpDel("UPDATE trx_purchase_details SET IsDeleted = 1 WHERE FuelPurchaseID = ?", [$id]);
+        $objQuery->inUpDel("UPDATE trx_stock_in SET IsDeleted = 1 WHERE ReferenceType = 'FuelPurchase' AND ReferenceID = ?", [$id]);
+        $objQuery->commit();
+
+        jsonResponse(true, 'Purchase deleted successfully!');
+    } catch (\Throwable $e) {
+        $objQuery->rollback();
+        jsonResponse(false, 'Error deleting record: ' . $e->getMessage());
+    }
 }

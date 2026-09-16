@@ -92,16 +92,18 @@ if ($generate) {
 
     // 3. Expenses (grouped by category)
     $sqlExpense = "SELECT
-        ec.CategoryNameEN,
+        COALESCE(ec.CategoryNameEN, ec_sal.CategoryNameEN, 'Salary') AS CategoryNameEN,
         SUM(e.Amount) AS TotalAmount,
         COUNT(*)      AS TotalRecords
     FROM trx_expense e
-    LEFT JOIN mst_expenseparticular ep ON e.ParticularID = ep.ParticularID
-    LEFT JOIN mst_expensecategory ec   ON ep.ExpenseCategoryID = ec.ExpenseCategoryID
+    LEFT JOIN mst_expenseparticular ep ON (e.ParticularID = ep.ParticularID OR e.ParticularID = CAST(ep.ExpenseParticularID AS CHAR)) AND ep.IsDeleted = 0
+    LEFT JOIN mst_expensecategory ec   ON ep.ExpenseCategoryID = ec.ExpenseCategoryID AND ec.IsDeleted = 0
+    LEFT JOIN mst_employee emp         ON (e.ParticularID = emp.EmployeeId OR e.ParticularID = CAST(emp.Id AS CHAR)) AND emp.IsDeleted = 0
+    LEFT JOIN mst_expensecategory ec_sal ON (emp.Id IS NOT NULL OR emp.EmployeeId IS NOT NULL) AND (ec_sal.ExpenseCategoryID = 11 OR ec_sal.CategoryNameEN = 'Salary') AND ec_sal.IsDeleted = 0
     WHERE e.ExpenseDate BETWEEN ? AND ?
       AND e.IsActive = 1 AND e.IsDeleted = 0
-    GROUP BY ec.ExpenseCategoryID
-    ORDER BY ec.CategoryNameEN";
+    GROUP BY COALESCE(ec.ExpenseCategoryID, ec_sal.ExpenseCategoryID, 11), COALESCE(ec.CategoryNameEN, ec_sal.CategoryNameEN, 'Salary')
+    ORDER BY CategoryNameEN";
     $expenseData = $objQuery->index($sqlExpense, [$startDate, $endDate]);
 
     // 4. Fuel Purchase

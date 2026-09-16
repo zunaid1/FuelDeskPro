@@ -42,6 +42,7 @@ $langLabel = currentLang() === 'bn' ? 'English' : 'বাংলা';
                     <li class="nav-item"><a class="nav-link small" href="<?php echo BASE_URL; ?>modules/operations/supplier_payment.php"><i class="fas fa-credit-card"></i> <?php echo t('Supplier Payment'); ?></a></li>
                     <li class="nav-item"><a class="nav-link small" href="<?php echo BASE_URL; ?>modules/operations/tank_reading.php"><i class="fas fa-chart-line"></i> <?php echo t('Tank Readings'); ?></a></li>
                     <li class="nav-item"><a class="nav-link small" href="<?php echo BASE_URL; ?>modules/operations/stock_adjustment.php"><i class="fas fa-boxes"></i> <?php echo t('Stock Adjustment'); ?></a></li>
+                    <li class="nav-item"><a class="nav-link small" href="<?php echo BASE_URL; ?>modules/operations/monthly_summary.php"><i class="fas fa-calendar-alt"></i> <?php echo t('Monthly Summary - LPG'); ?></a></li>
                 </ul>
             </div>
         </li>
@@ -64,33 +65,54 @@ $langLabel = currentLang() === 'bn' ? 'English' : 'বাংলা';
                     <li class="nav-item"><a class="nav-link small" href="<?php echo BASE_URL; ?>modules/master_data/shareholder.php"><i class="fas fa-users"></i> <?php echo t('Shareholders'); ?></a></li>
                     <li class="nav-item"><a class="nav-link small" href="<?php echo BASE_URL; ?>modules/master_data/employee.php"><i class="fas fa-user-tie"></i> <?php echo t('Employee'); ?></a></li>
                     <li class="nav-item"><a class="nav-link small" href="<?php echo BASE_URL; ?>modules/master_data/customer.php"><i class="fas fa-user-friends"></i> <?php echo t('Customer'); ?></a></li>
+                    <li class="nav-item"><a class="nav-link small" href="<?php echo BASE_URL; ?>modules/master_data/bank_account.php"><i class="fas fa-university"></i> <?php echo t('Bank Accounts'); ?></a></li>
                     <li class="nav-item"><a class="nav-link small" href="<?php echo BASE_URL; ?>modules/master_data/particular_group.php"><i class="fas fa-tags"></i> <?php echo t('Particular Group'); ?></a></li>
                     <li class="nav-item"><a class="nav-link small" href="<?php echo BASE_URL; ?>modules/master_data/particular.php"><i class="fas fa-list"></i> <?php echo t('Particular'); ?></a></li>
+                    <li class="nav-item"><a class="nav-link small" href="<?php echo BASE_URL; ?>modules/master_data/system_setting.php"><i class="fas fa-sliders-h"></i> <?php echo t('System Settings'); ?></a></li>
+                    <li class="nav-item"><a class="nav-link small" href="<?php echo BASE_URL; ?>modules/settings/final_submit_setting.php"><i class="fas fa-calendar-check"></i> <?php echo t('Daily Statement Closing Status'); ?></a></li>
                 </ul>
             </div>
         </li>
 
         <!-- Reports Dropdown -->
+        <?php $isReportPage = in_array($currentPage, ['daily_statement.php', 'profit_loss.php', 'date_to_date_statement.php', 'monthly_collection_expense_summary.php', 'monthly_expense_item_wise.php', 'stock_summary.php']); ?>
         <li class="nav-item">
-            <a class="nav-link" data-bs-toggle="collapse" href="#reportsMenu" role="button" aria-expanded="false">
+            <a class="nav-link <?php echo $isReportPage ? '' : 'collapsed'; ?>" data-bs-toggle="collapse" href="#reportsMenu" role="button" aria-expanded="<?php echo $isReportPage ? 'true' : 'false'; ?>">
                 <i class="fas fa-chart-bar"></i> <span><?php echo t('Reports'); ?></span>
                 <i class="fas fa-chevron-down ms-auto"></i>
             </a>
-            <div class="collapse" id="reportsMenu">
+            <div class="collapse <?php echo $isReportPage ? 'show' : ''; ?>" id="reportsMenu">
                 <ul class="nav flex-column ms-3">
-                    <li class="nav-item"><a class="nav-link small" href="<?php echo BASE_URL; ?>modules/reports/profit_loss.php"><i class="fas fa-chart-line"></i> <?php echo t('Profit / Loss Report'); ?></a></li>
-                    <li class="nav-item"><a class="nav-link small" href="<?php echo BASE_URL; ?>modules/reports/date_to_date_statement.php"><i class="fas fa-file-invoice-dollar"></i> <?php echo t('Date To Date All Statement'); ?></a></li>
-                    <li class="nav-item"><a class="nav-link small" href="<?php echo BASE_URL; ?>modules/reports/monthly_collection_expense_summary.php"><i class="fas fa-chart-line"></i> <?php echo t('Monthly Collection & Expense Summary'); ?></a></li>
-                    <li class="nav-item"><a class="nav-link small" href="<?php echo BASE_URL; ?>modules/reports/monthly_expense_item_wise.php"><i class="fas fa-receipt"></i> <?php echo t('Monthly Expense Summary Item Wise'); ?></a></li>
+                    <li class="nav-item"><a class="nav-link small <?php echo $currentPage == 'daily_statement.php' ? 'active' : ''; ?>" href="<?php echo BASE_URL; ?>modules/reports/daily_statement.php"><i class="fas fa-file-alt"></i> <?php echo t('Daily Statement'); ?></a></li>
+                    <li class="nav-item"><a class="nav-link small <?php echo $currentPage == 'profit_loss.php' ? 'active' : ''; ?>" href="<?php echo BASE_URL; ?>modules/reports/profit_loss.php"><i class="fas fa-chart-line"></i> <?php echo t('Profit / Loss Report'); ?></a></li>
+                    <li class="nav-item"><a class="nav-link small <?php echo $currentPage == 'date_to_date_statement.php' ? 'active' : ''; ?>" href="<?php echo BASE_URL; ?>modules/reports/date_to_date_statement.php"><i class="fas fa-file-invoice-dollar"></i> <?php echo t('Date To Date All Statement'); ?></a></li>
+                    <li class="nav-item"><a class="nav-link small <?php echo $currentPage == 'monthly_collection_expense_summary.php' ? 'active' : ''; ?>" href="<?php echo BASE_URL; ?>modules/reports/monthly_collection_expense_summary.php"><i class="fas fa-chart-line"></i> <?php echo t('Monthly Collection & Expense Summary'); ?></a></li>
+                    <li class="nav-item"><a class="nav-link small <?php echo $currentPage == 'monthly_expense_item_wise.php' ? 'active' : ''; ?>" href="<?php echo BASE_URL; ?>modules/reports/monthly_expense_item_wise.php"><i class="fas fa-receipt"></i> <?php echo t('Monthly Expense Summary Item Wise'); ?></a></li>
+                    <li class="nav-item"><a class="nav-link small <?php echo $currentPage == 'stock_summary.php' ? 'active' : ''; ?>" href="<?php echo BASE_URL; ?>modules/reports/stock_summary.php"><i class="fas fa-boxes"></i> <?php echo t('Stock Summary'); ?></a></li>
                 </ul>
             </div>
         </li>
 
-        <!-- Settings -->
+        <!-- Settings Dropdown -->
         <li class="nav-item">
-            <a class="nav-link" href="#">
+            <a class="nav-link <?php echo in_array($currentPage, ['final_submit_setting.php', 'system_setting.php']) ? '' : 'collapsed'; ?>" data-bs-toggle="collapse" href="#settingsMenu" role="button" aria-expanded="<?php echo in_array($currentPage, ['final_submit_setting.php', 'system_setting.php']) ? 'true' : 'false'; ?>">
                 <i class="fas fa-cog"></i> <span><?php echo t('Settings'); ?></span>
+                <i class="fas fa-chevron-down ms-auto"></i>
             </a>
+            <div class="collapse <?php echo in_array($currentPage, ['final_submit_setting.php', 'system_setting.php']) ? 'show' : ''; ?>" id="settingsMenu">
+                <ul class="nav flex-column ms-3">
+                    <li class="nav-item">
+                        <a class="nav-link small <?php echo $currentPage == 'final_submit_setting.php' ? 'active' : ''; ?>" href="<?php echo BASE_URL; ?>modules/settings/final_submit_setting.php">
+                            <i class="fas fa-calendar-check"></i> <?php echo t('Daily Statement Closing Status'); ?>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link small <?php echo $currentPage == 'system_setting.php' ? 'active' : ''; ?>" href="<?php echo BASE_URL; ?>modules/master_data/system_setting.php">
+                            <i class="fas fa-sliders-h"></i> <?php echo t('System Settings'); ?>
+                        </a>
+                    </li>
+                </ul>
+            </div>
         </li>
     </ul>
 </nav>

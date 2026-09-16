@@ -7,6 +7,11 @@ $customers = $objQuery->index("SELECT * FROM vw_customerlistall");
 $fuels = $objQuery->index("SELECT FuelTypeID, FuelName FROM mst_fueltype WHERE IsActive=1 AND IsDeleted=0");
 $data = $objQuery->index("SELECT cd.*, c.CustomerName, c.Mobile, ft.FuelName FROM trx_customerdue cd LEFT JOIN mst_customer c ON cd.CustomerID=c.CustomerID LEFT JOIN mst_fueltype ft ON cd.FuelTypeID=ft.FuelTypeID WHERE cd.IsDeleted=0 ORDER BY cd.TxnDate DESC, cd.CustomerDueID DESC");
 ?>
+<?php if (isStatementClosed(today())): ?>
+<div class="alert alert-danger shadow-sm border-danger text-center fw-bold fs-6 mb-3 py-2">
+    <i class="fas fa-lock me-2"></i> আজকের তারিখের (<?php echo date('d-m-Y'); ?>) হিসাবটি ইতোমধ্যে ক্লোজ করা হয়েছে
+</div>
+<?php endif; ?>
 <div class="table-container">
     <div class="table-header"><h5><i class="fas fa-file-invoice text-primary me-2"></i>Customer Dues</h5>
         <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addModal"><i class="fas fa-plus"></i> Add New Due</button></div>

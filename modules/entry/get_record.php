@@ -54,6 +54,12 @@ $map = [
         'fields' => ['NozzleID', 'NozzleName', 'NozzleNo', 'DisID', 'FuelTypeID', 'TankGroupID', 'OpeningGeneral', 'OpeningMaster', 'IsActive'],
         'aliases' => ['NozzleID' => 'record_id', 'NozzleName' => 'nozzle_name', 'NozzleNo' => 'nozzle_no', 'DisID' => 'dis_id', 'FuelTypeID' => 'fuel_type_id', 'TankGroupID' => 'tank_group_id', 'OpeningGeneral' => 'opening_general', 'OpeningMaster' => 'opening_master', 'IsActive' => 'is_active'],
     ],
+    'bank_account_entry.php' => [
+        'table' => 'mst_bankaccount',
+        'pk' => 'BankAccountID',
+        'fields' => ['BankAccountID', 'BankName', 'BranchName', 'AccountName', 'AccountNumber', 'AccountType', 'RoutingNumber', 'OpeningBalance', 'OpeningDate', 'CurrentBalance', 'IsActive'],
+        'aliases' => ['BankAccountID' => 'record_id', 'BankName' => 'bank_name', 'BranchName' => 'branch_name', 'AccountName' => 'account_name', 'AccountNumber' => 'account_number', 'AccountType' => 'account_type', 'RoutingNumber' => 'routing_number', 'OpeningBalance' => 'opening_balance', 'OpeningDate' => 'opening_date', 'CurrentBalance' => 'current_balance', 'IsActive' => 'is_active'],
+    ],
     'supplier_entry.php' => [
         'table' => 'mst_supplier',
         'pk' => 'SupplierID',
@@ -180,6 +186,12 @@ foreach ($config['aliases'] as $dbField => $formField) {
 if ($source === 'cash_collection_entry.php') {
     $prefix = ($row->CollectedByType ?? '') === 'Employee' ? 'emp' : 'sh';
     $formData['collected_person_id'] = $prefix . '_' . ($row->CollectedPersonID ?? '');
+}
+
+if ($source === 'fuel_purchase_entry.php') {
+    ensureFuelPurchaseTablesExist();
+    $items = $objQuery->index("SELECT * FROM trx_purchase_details WHERE FuelPurchaseID = ? AND IsDeleted = 0 ORDER BY PurchaseDetailID ASC", [$id]);
+    $formData['items'] = $items;
 }
 
 jsonResponse(true, 'Record loaded successfully!', ['data' => $formData]);

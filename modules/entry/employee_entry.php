@@ -9,10 +9,33 @@ switch ($action) {
     case 'delete': handleDelete(); break;
     default: jsonResponse(false, 'Invalid action!');
 }
+
+function ensureTableSchema() {
+    global $objQuery;
+    try {
+        $tableInfo = $objQuery->index("SHOW CREATE TABLE mst_employee");
+        if (!empty($tableInfo) && isset($tableInfo[0]->{'Create Table'})) {
+            $createTableSql = $tableInfo[0]->{'Create Table'};
+            if (strpos($createTableSql, 'AUTO_INCREMENT') === false) {
+                $objQuery->inUpDel("ALTER TABLE mst_employee MODIFY Id INT(11) NOT NULL AUTO_INCREMENT");
+            }
+        }
+        $cols = $objQuery->index("SHOW COLUMNS FROM mst_employee LIKE 'ExpenseCategoryID'");
+        if (empty($cols)) {
+            $objQuery->inUpDel("ALTER TABLE mst_employee ADD COLUMN ExpenseCategoryID INT(11) NULL DEFAULT 11 AFTER EmployeeId");
+        }
+    } catch (Exception $e) {
+        // Handle gracefully
+    }
+}
+
 function handleSave() {
     global $objQuery;
+    ensureTableSchema();
     $id = intval($_POST['record_id'] ?? 0);
-    $eid = sanitize($_POST['emp_id'] ?? '');
+    $expCatId = intval($_POST['expense_category_id'] ?? 11);
+    if ($expCatId <= 0) $expCatId = 11;
+
     $nameEn = sanitize($_POST['name_en'] ?? '');
     $nameBn = sanitize($_POST['name_bn'] ?? '');
     $father = sanitize($_POST['father'] ?? '');
@@ -26,12 +49,17 @@ function handleSave() {
     $salary = floatval($_POST['salary'] ?? 0);
     $remarks = sanitize($_POST['remarks'] ?? '');
     $active = intval($_POST['is_active'] ?? 1);
-    if (empty($nameEn) || empty($mobile) || empty($nid)) jsonResponse(false, 'Name, mobile, and NID are required!');
+
+    if (empty($nameEn) || empty($nameBn)) jsonResponse(false, 'Name (EN) and Name (BN) are required!');
+
     if ($id > 0) {
-        $objQuery->inUpDel("UPDATE mst_employee SET EmployeeId=?, NameEN=?, NameBN=?, FatherName=?, MotherName=?, DateOfBirth=?, JoiningDate=?, Mobile=?, Address=?, NationalID=?, Guarantor=?, Salary=?, Remarks=?, IsActive=?, UpdatedBy=?, UpdatedAt=NOW() WHERE Id=? AND IsDeleted=0", [$eid, $nameEn, $nameBn, $father, $mother, $dob, $joining, $mobile, $address, $nid, $guarantor, $salary, $remarks, $active, getUserId(), $id]);
+        $objQuery->inUpDel("UPDATE mst_employee SET ExpenseCategoryID=?, NameEN=?, NameBN=?, FatherName=?, MotherName=?, DateOfBirth=?, JoiningDate=?, Mobile=?, Address=?, NationalID=?, Guarantor=?, Salary=?, Remarks=?, IsActive=?, UpdatedBy=?, UpdatedAt=NOW() WHERE Id=? AND IsDeleted=0", [$expCatId, $nameEn, $nameBn, $father, $mother, $dob, $joining, $mobile, $address, $nid, $guarantor, $salary, $remarks, $active, getUserId(), $id]);
         jsonResponse(true, 'Employee updated successfully!');
     } else {
-        $objQuery->inUpDel("INSERT INTO mst_employee (EmployeeId, NameEN, NameBN, FatherName, MotherName, DateOfBirth, JoiningDate, Mobile, Address, NationalID, Guarantor, Salary, Remarks, CreatedBy, IsActive) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", [$eid, $nameEn, $nameBn, $father, $mother, $dob, $joining, $mobile, $address, $nid, $guarantor, $salary, $remarks, getUserId(), $active]);
+        $objQuery->inUpDel("INSERT INTO mst_employee (ExpenseCategoryID, NameEN, NameBN, FatherName, MotherName, DateOfBirth, JoiningDate, Mobile, Address, NationalID, Guarantor, Salary, Remarks, CreatedBy, IsActive) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", [$expCatId, $nameEn, $nameBn, $father, $mother, $dob, $joining, $mobile, $address, $nid, $guarantor, $salary, $remarks, getUserId(), $active]);
+        $newId = $objQuery->getLastInsertId();
+        $eid = 'EMP' . $newId;
+        $objQuery->inUpDel("UPDATE mst_employee SET EmployeeId=? WHERE Id=?", [$eid, $newId]);
         jsonResponse(true, 'Employee added successfully!');
     }
 }

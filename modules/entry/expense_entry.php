@@ -19,6 +19,8 @@ function handleSave() {
     $ref = sanitize($_POST['reference_no'] ?? '');
     $remarks = sanitize($_POST['remarks'] ?? '');
     if (empty($date) || empty($particular) || $amount <= 0) jsonResponse(false, 'Required fields missing!');
+    if (isStatementClosed($date)) jsonResponse(false, 'এই তারিখের ('.date('d-m-Y', strtotime($date)).') হিসাবটি ইতোমধ্যে ক্লোজ করা হয়েছে!');
+
     if ($id > 0) {
         $objQuery->inUpDel("UPDATE trx_expense SET ExpenseDate=?, ParticularID=?, Amount=?, PaymentMethodID=?, ReferenceNo=?, Remarks=?, UpdatedBy=?, UpdatedAt=NOW() WHERE ExpenseID=? AND IsDeleted=0", [$date, $particular, $amount, $method, $ref, $remarks, getUserId(), $id]);
         jsonResponse(true, 'Expense updated successfully!');
@@ -30,6 +32,10 @@ function handleSave() {
 function handleDelete() {
     global $objQuery; $id = intval($_POST['record_id'] ?? 0);
     if ($id <= 0) jsonResponse(false, 'Invalid ID!');
+    $rec = $objQuery->fetch("SELECT ExpenseDate FROM trx_expense WHERE ExpenseID=?", [$id]);
+    if ($rec && isStatementClosed($rec['ExpenseDate'])) {
+        jsonResponse(false, 'এই তারিখের হিসাবটি ইতোমধ্যে ফাইনাল সাবমিট (ক্লোজ) করা হয়েছে!');
+    }
     $objQuery->inUpDel("UPDATE trx_expense SET IsDeleted=1, UpdatedBy=?, UpdatedAt=NOW() WHERE ExpenseID=?", [getUserId(), $id]);
     jsonResponse(true, 'Expense deleted successfully!');
 }

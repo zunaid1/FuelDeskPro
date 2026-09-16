@@ -21,6 +21,7 @@ function handleSave() {
     $narration = sanitize($_POST['narration'] ?? '');
     $remarks = sanitize($_POST['remarks'] ?? '');
     if (empty($date) || !$particular || $amount <= 0 || !$method) jsonResponse(false, 'Required fields missing!');
+    if (isStatementClosed($date)) jsonResponse(false, 'এই তারিখের হিসাবটি ইতোমধ্যে ফাইনাল সাবমিট (ক্লোজ) করা হয়েছে!');
     if ($id > 0) {
         $objQuery->inUpDel("UPDATE trx_otherscollection SET CollectionDate=?, ParticularID=?, PartyName=?, Amount=?, PaymentMethodID=?, ReferenceNo=?, Narration=?, Remarks=?, UpdatedBy=?, UpdatedAt=NOW() WHERE OthersCollectionID=? AND IsDeleted=0", [$date, $particular, $party, $amount, $method, $ref, $narration, $remarks, getUserId(), $id]);
         jsonResponse(true, 'Collection updated successfully!');
@@ -32,6 +33,10 @@ function handleSave() {
 function handleDelete() {
     global $objQuery; $id = intval($_POST['record_id'] ?? 0);
     if ($id <= 0) jsonResponse(false, 'Invalid ID!');
+    $rec = $objQuery->fetch("SELECT CollectionDate FROM trx_otherscollection WHERE OthersCollectionID=?", [$id]);
+    if ($rec && isStatementClosed($rec['CollectionDate'])) {
+        jsonResponse(false, 'এই তারিখের হিসাবটি ইতোমধ্যে ফাইনাল সাবমিট (ক্লোজ) করা হয়েছে!');
+    }
     $objQuery->inUpDel("UPDATE trx_otherscollection SET IsDeleted=1, UpdatedBy=?, UpdatedAt=NOW() WHERE OthersCollectionID=?", [getUserId(), $id]);
     jsonResponse(true, 'Collection deleted successfully!');
 }

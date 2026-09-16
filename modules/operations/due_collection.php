@@ -7,6 +7,11 @@ $customers = $objQuery->index("SELECT CustomerID, CustomerName, Mobile FROM mst_
 $methods = $objQuery->index("SELECT PaymentMethodID, MethodName FROM cfg_paymentmethod WHERE IsActive=1 AND IsDeleted=0");
 $data = $objQuery->index("SELECT cc.*, c.CustomerName, pm.MethodName FROM trx_customercollection cc LEFT JOIN mst_customer c ON cc.CustomerID=c.CustomerID LEFT JOIN cfg_paymentmethod pm ON cc.PaymentMethodID=pm.PaymentMethodID WHERE cc.IsDeleted=0 ORDER BY cc.TxnDate DESC, cc.CustomerCollectionID DESC");
 ?>
+<?php if (isStatementClosed(today())): ?>
+<div class="alert alert-danger shadow-sm border-danger text-center fw-bold fs-6 mb-3 py-2">
+    <i class="fas fa-lock me-2"></i> আজকের তারিখের (<?php echo date('d-m-Y'); ?>) হিসাবটি ইতোমধ্যে ক্লোজ করা হয়েছে
+</div>
+<?php endif; ?>
 <div class="table-container">
     <div class="table-header"><h5><i class="fas fa-hand-holding-usd text-primary me-2"></i>Due Collections</h5>
         <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addModal"><i class="fas fa-plus"></i> Add New Collection</button></div>

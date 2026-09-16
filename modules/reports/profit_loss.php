@@ -3,15 +3,8 @@
  * FuelDeskPro - Profit / Loss Report  (profit_loss.php)
  *
  * Calculates gross profit and net profit for a selected date range using the
- * Average Cost (AVCO) method:
- *
- *   Opening Stock Value  = cumulative purchase cost up to (start_date - 1 day)
- *                          minus cumulative cost of goods already sold before start_date
- *   Purchase Cost        = total purchase cost within the period
- *   Closing Stock Value  = closing qty × weighted-average cost per litre (all time)
- *   COGS                 = Opening Stock Value + Purchase Cost - Closing Stock Value
- *   Gross Profit         = Sales Amount - COGS
- *   Net Profit           = Gross Profit - Operating Expenses + Other Income
+ * Average Cost (AVCO) method.
+ * Supports bilingual display (Bangla / English).
  *
  * @package FuelDeskPro
  */
@@ -22,16 +15,203 @@ require_once __DIR__ . '/../../includes/header.php';
 require_once __DIR__ . '/../../includes/sidebar.php';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// INPUT HANDLING
+// INPUT & LANGUAGE HANDLING
 // ─────────────────────────────────────────────────────────────────────────────
 $startDate = $_GET['start_date'] ?? date('Y-m-01');
 $endDate   = $_GET['end_date']   ?? date('Y-m-t');
+$lang      = $_GET['lang']       ?? currentLang();
+
+if (!in_array($lang, ['bn', 'en'])) { $lang = 'bn'; }
 
 if (strlen($startDate) === 7) { $startDate .= '-01'; }
 if (strlen($endDate)   === 7) { $endDate   .= '-' . date('t', strtotime($endDate . '-01')); }
 
 $prevDay  = date('Y-m-d', strtotime($startDate . ' -1 day'));   // day before period
 $generate = isset($_GET['generate']);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// LANGUAGE LABELS
+// ─────────────────────────────────────────────────────────────────────────────
+if ($lang === 'en') {
+    $lblReportTitle          = 'Profit / Loss Report';
+    $lblFromDate             = 'From Date';
+    $lblToDate               = 'To Date';
+    $lblLanguage             = 'Language';
+    $lblGenerate             = 'Generate Report';
+    $lblPrint                = 'Print';
+    $lblPeriod               = 'Period';
+    $lblMethod               = 'Method';
+    $lblGenerated            = 'Generated';
+    
+    // Metric Cards
+    $lblCardTotalSales       = 'Total Sales';
+    $lblCardCOGS             = 'Cost of Goods Sold';
+    $lblCardGrossProfit      = 'Gross Profit';
+    $lblCardNetProfit        = 'Net Profit';
+    $lblCardNetLoss          = 'Net Loss';
+    $lblCardClosingVal       = 'Closing Stock Value';
+    $lblCardFuelSold         = 'Fuel Sold';
+    $lblCardOperatingExp     = 'Operating Expenses';
+    $lblCardProfitPct        = 'Profit %';
+    $lblCardSoldSub          = 'L sold';
+    $lblCardPurchCostSub     = 'Purchase cost:';
+    $lblCardMarginSub        = 'Margin:';
+    $lblCardNetMarginSub     = 'Net margin:';
+    $lblCardAvcoSub          = 'Inventory at AVCO';
+    $lblCardPeriodSub        = 'In selected period';
+    $lblCardOtherIncSub      = 'Other income:';
+    $lblCardGrossSub         = 'Gross:';
+
+    // Section 1: Fuel-wise Statement
+    $lblFuelSecTitle         = 'Fuel-wise Inventory & Profit Statement';
+    $lblThItem               = 'Item';
+    $lblThOpenStock          = 'Opening Stock';
+    $lblThPurchase           = 'Purchase';
+    $lblThTotAvailable       = 'Total Available';
+    $lblThSoldQty            = 'Sold Qty';
+    $lblThClosingStock       = 'Closing Stock';
+    $lblThCOGS               = 'COGS';
+    $lblThSalesAmt           = 'Sales Amt';
+    $lblThGrossProfit        = 'Gross Profit';
+    $lblThMargin             = 'Margin';
+    $lblThQtyL               = 'Qty (L)';
+    $lblThValue              = 'Value (' . $currencySymbol . ')';
+    $lblThCost               = 'Cost (' . $currencySymbol . ')';
+    $lblNoData               = 'No data found for the selected period.';
+    $lblTotal                = 'TOTAL';
+
+    // Section 2: Operating Expenses Breakdown
+    $lblExpSecTitle          = 'Operating Expenses Breakdown';
+    $lblThCategory           = 'Category';
+    $lblThParticular         = 'Particular';
+    $lblThEntries            = 'Entries';
+    $lblThAmount             = 'Amount (' . $currencySymbol . ')';
+    $lblTotalExpenses        = 'Total Expenses:';
+
+    // Section 3: Sales Analysis
+    $lblSalesAnalysisTitle   = 'Sales Analysis — Cash vs Credit';
+    $lblThDescription        = 'Description';
+    $lblThPctTotal           = '% of Total Sales';
+    $lblCashSales            = 'Cash Sales';
+    $lblCreditSales          = 'Credit Sales';
+
+    // Section 4: Summary P&L
+    $lblPLSummaryTitle       = 'Profit & Loss Summary';
+    $lblOtherIncome          = 'Other Income';
+    
+    // Balance Sheet Highlights
+    $lblBSHighlightsTitle    = 'Balance Sheet Highlights';
+    $lblCustReceivable       = 'Customer Receivable';
+    $lblSupplierPayable      = 'Supplier Payable';
+    $lblCashSalesAmt         = 'Cash Sales Amount';
+    $lblCreditSalesAmt       = 'Credit Sales Amount';
+    $lblTotalPurchPeriod     = 'Total Purchase (Period)';
+    $lblFuelSoldPeriod       = 'Fuel Sold (Period)';
+    $lblOpenStockValue       = 'Opening Stock Value';
+
+    // Note Section
+    $lblCostingMethod        = 'Costing Method: Average Cost (AVCO)';
+    $lblNoteOpenStock        = 'Opening Stock Value = Opening Qty × Weighted Avg Cost per litre (up to day before period)';
+    $lblNoteCOGS             = 'COGS = Opening Stock Value + Purchase Cost − Closing Stock Value';
+    $lblNoteGrossProfit      = 'Gross Profit = Sales Amount − COGS';
+    $lblNoteNetProfit        = 'Net Profit = Gross Profit − Operating Expenses + Other Income';
+
+    // Placeholder
+    $lblSelectDateRange      = 'Select a date range and click Generate Report';
+    $lblAvcoNote             = 'This report shows profit & loss using the Average Cost (AVCO) method.';
+} else {
+    // Bangla
+    $lblReportTitle          = 'লাভ / ক্ষতি হিসাব রিপোর্ট';
+    $lblFromDate             = 'শুরুর তারিখ';
+    $lblToDate               = 'শেষ তারিখ';
+    $lblLanguage             = 'ভাষা (Language)';
+    $lblGenerate             = 'রিপোর্ট দেখুন';
+    $lblPrint                = 'প্রিন্ট';
+    $lblPeriod               = 'সময়কাল';
+    $lblMethod               = 'পদ্ধতি';
+    $lblGenerated            = 'তৈরির সময়';
+    
+    // Metric Cards
+    $lblCardTotalSales       = 'মোট বিক্রয় (Total Sales)';
+    $lblCardCOGS             = 'বিক্রীত পণ্যের ব্যয় (COGS)';
+    $lblCardGrossProfit      = 'মোট লাভ (Gross Profit)';
+    $lblCardNetProfit        = 'নিট লাভ (Net Profit)';
+    $lblCardNetLoss          = 'নিট ক্ষতি (Net Loss)';
+    $lblCardClosingVal       = 'সমাপনী মজুদের মূল্য';
+    $lblCardFuelSold         = 'মোট জ্বালানি বিক্রয়';
+    $lblCardOperatingExp     = 'পরিচালন ব্যয় (Expenses)';
+    $lblCardProfitPct        = 'লাভের হার (%)';
+    $lblCardSoldSub          = 'লিটার বিক্রয়';
+    $lblCardPurchCostSub     = 'ক্রয় ব্যয়:';
+    $lblCardMarginSub        = 'মার্জিন:';
+    $lblCardNetMarginSub     = 'নিট মার্জিন:';
+    $lblCardAvcoSub          = 'AVCO পদ্ধতিতে মজুদ';
+    $lblCardPeriodSub        = 'নির্বাচিত সময়কালে';
+    $lblCardOtherIncSub      = 'অন্যান্য আয়:';
+    $lblCardGrossSub         = 'মোট লাভ:';
+
+    // Section 1: Fuel-wise Statement
+    $lblFuelSecTitle         = 'পণ্যভিত্তিক মজুদ ও লাভ-ক্ষতি বিবরণী';
+    $lblThItem               = 'পণ্য/আইটেম';
+    $lblThOpenStock          = 'প্রারম্ভিক মজুদ';
+    $lblThPurchase           = 'ক্রয়';
+    $lblThTotAvailable       = 'মোট মজুদ';
+    $lblThSoldQty            = 'বিক্রয় পরিমাণ';
+    $lblThClosingStock       = 'সমাপনী মজুদ';
+    $lblThCOGS               = 'COGS (ব্যয়)';
+    $lblThSalesAmt           = 'বিক্রয় মূল্য';
+    $lblThGrossProfit        = 'মোট লাভ (Gross Profit)';
+    $lblThMargin             = 'মার্জিন';
+    $lblThQtyL               = 'পরিমাণ (লিটার)';
+    $lblThValue              = 'মূল্য (' . $currencySymbol . ')';
+    $lblThCost               = 'ক্রয়মূল্য (' . $currencySymbol . ')';
+    $lblNoData               = 'নির্বাচিত সময়ে কোনো তথ্য পাওয়া যায়নি।';
+    $lblTotal                = 'সর্বমোট (TOTAL)';
+
+    // Section 2: Operating Expenses Breakdown
+    $lblExpSecTitle          = 'পরিচালন ব্যয়ের বিবরণী (Operating Expenses)';
+    $lblThCategory           = 'ক্যাটাগরি';
+    $lblThParticular         = 'খাত/বিবরণ (Particular)';
+    $lblThEntries            = 'এন্ট্রি সংখ্যা';
+    $lblThAmount             = 'পরিমাণ (' . $currencySymbol . ')';
+    $lblTotalExpenses        = 'সর্বমোট পরিচালন ব্যয়:';
+
+    // Section 3: Sales Analysis
+    $lblSalesAnalysisTitle   = 'বিক্রয় বিশ্লেষণ — নগদ বনাম বাকী';
+    $lblThDescription        = 'বিবরণ';
+    $lblThPctTotal           = 'মোট বিক্রয়ের %';
+    $lblCashSales            = 'নগদ বিক্রয় (Cash Sales)';
+    $lblCreditSales          = 'বাকী বিক্রয় (Credit Sales)';
+
+    // Section 4: Summary P&L
+    $lblPLSummaryTitle       = 'লাভ-ক্ষতি সংক্ষিপ্ত সারসংক্ষেপ';
+    $lblOtherIncome          = 'অন্যান্য খাতে আয় (Other Income)';
+    
+    // Balance Sheet Highlights
+    $lblBSHighlightsTitle    = 'ব্যালেন্স শিট মূল সূচকসমূহ';
+    $lblCustReceivable       = 'গ্রাহকের নিকট মোট পাওনা (Customer Dues)';
+    $lblSupplierPayable      = 'সাপ্লায়ার দেনা (Supplier Payable)';
+    $lblCashSalesAmt         = 'নগদ বিক্রয় (Cash Sales)';
+    $lblCreditSalesAmt       = 'বাকী বিক্রয় (Credit Sales)';
+    $lblTotalPurchPeriod     = 'মোট ক্রয় মূল্য (সময়ের মধ্যে)';
+    $lblFuelSoldPeriod       = 'মোট বিক্রয়কৃত লিটার';
+    $lblOpenStockValue       = 'প্রারম্ভিক মজুদের মূল্য (Opening Stock)';
+
+    // Note Section
+    $lblCostingMethod        = 'হিসাব পদ্ধতি: এভারেজ কস্ট পদ্ধতি (AVCO - Average Costing)';
+    $lblNoteOpenStock        = 'প্রারম্ভিক মজুদের মূল্য = প্রারম্ভিক লিটার × প্রতি লিটার এভারেজ ক্রয়মূল্য (সময়ের পূর্বের দিন পর্যন্ত)';
+    $lblNoteCOGS             = 'বিক্রীত পণ্যের ব্যয় (COGS) = প্রারম্ভিক মজুদের মূল্য + মোট ক্রয় মূল্য − সমাপনী মজুদের মূল্য';
+    $lblNoteGrossProfit      = 'মোট লাভ (Gross Profit) = মোট বিক্রয় মূল্য − COGS';
+    $lblNoteNetProfit        = 'নিট লাভ (Net Profit) = মোট লাভ − পরিচালন ব্যয় + অন্যান্য আয়';
+
+    // Placeholder
+    $lblSelectDateRange      = 'তারিখ সিলেক্ট করে "রিপোর্ট দেখুন" বাটনে ক্লিক করুন';
+    $lblAvcoNote             = 'এই রিপোর্টটি এভারেজ কস্ট (AVCO) পদ্ধতিতে লাভ ও ক্ষতি হিসাব করে।';
+}
+
+$pageTitle = $lblReportTitle;
+$companyNameDisplay = $company ? ($lang === 'en' ? (!empty($company->CompanyName) ? $company->CompanyName : ($company->CompanyNameBN ?? 'FuelDeskPro')) : (!empty($company->CompanyNameBN) ? $company->CompanyNameBN : ($company->CompanyName ?? 'FuelDeskPro'))) : 'FuelDeskPro';
+$companyAddressDisplay = $company ? ($lang === 'en' ? (!empty($company->AddressEN) ? $company->AddressEN : ($company->Address ?? '')) : (!empty($company->AddressBN) ? $company->AddressBN : ($company->AddressEN ?? ($company->Address ?? '')))) : '';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // HELPER
@@ -78,7 +258,6 @@ if ($generate) {
         $openQty = max(0, $openPurchaseQty - $openSalesQty);
 
         // ── 1b. Opening stock VALUE  (avg cost × opening qty) ────────────────
-        // All-time weighted average cost per litre up to end of previous day
         $allTimePurchaseCostPre = safeFloat($objQuery->index(
             "SELECT COALESCE(SUM(TotalAmount),0) AS v FROM trx_fuelpurchase
               WHERE FuelTypeID=? AND PurchaseDate<=? AND IsActive=1 AND IsDeleted=0",
@@ -116,7 +295,6 @@ if ($generate) {
         $totalAvailable = $openQty + $purchQty;
         $closingQty     = max(0, $totalAvailable - $soldQty);
 
-        // All-time weighted average cost per litre up to END of period
         $allTimePurchaseCostFull = safeFloat($objQuery->index(
             "SELECT COALESCE(SUM(TotalAmount),0) AS v FROM trx_fuelpurchase
               WHERE FuelTypeID=? AND PurchaseDate<=? AND IsActive=1 AND IsDeleted=0",
@@ -161,16 +339,20 @@ if ($generate) {
 
     // ── 2. OPERATING EXPENSES ─────────────────────────────────────────────────
     $expenseDetail = $objQuery->index(
-        "SELECT ec.CategoryNameEN AS Category,
-                ep.ParticularNameEN AS Particular,
+        "SELECT COALESCE(ec.CategoryNameEN, ec_sal.CategoryNameEN, 'Salary') AS CategoryNameEN,
+                COALESCE(ec.CategoryNameBN, ec_sal.CategoryNameBN, 'বেতন') AS CategoryNameBN,
+                COALESCE(ep.ParticularNameEN, emp.NameEN, e.ParticularID) AS ParticularNameEN,
+                COALESCE(ep.ParticularNameBN, emp.NameBN, emp.NameEN, e.ParticularID) AS ParticularNameBN,
                 SUM(e.Amount) AS Total, COUNT(*) AS Cnt
            FROM trx_expense e
-      LEFT JOIN mst_expenseparticular ep ON e.ParticularID = ep.ParticularID
-      LEFT JOIN mst_expensecategory   ec ON ep.ExpenseCategoryID = ec.ExpenseCategoryID
+      LEFT JOIN mst_expenseparticular ep ON (e.ParticularID = ep.ParticularID OR e.ParticularID = CAST(ep.ExpenseParticularID AS CHAR)) AND ep.IsDeleted = 0
+      LEFT JOIN mst_expensecategory   ec ON ep.ExpenseCategoryID = ec.ExpenseCategoryID AND ec.IsDeleted = 0
+      LEFT JOIN mst_employee emp         ON (e.ParticularID = emp.EmployeeId OR e.ParticularID = CAST(emp.Id AS CHAR)) AND emp.IsDeleted = 0
+      LEFT JOIN mst_expensecategory ec_sal ON (emp.Id IS NOT NULL OR emp.EmployeeId IS NOT NULL) AND (ec_sal.ExpenseCategoryID = 11 OR ec_sal.CategoryNameEN = 'Salary') AND ec_sal.IsDeleted = 0
           WHERE e.ExpenseDate BETWEEN ? AND ?
             AND e.IsActive=1 AND e.IsDeleted=0
-          GROUP BY ep.ParticularID
-          ORDER BY ec.CategoryNameEN, ep.ParticularNameEN",
+          GROUP BY e.ParticularID, ep.ParticularID, emp.EmployeeId
+          ORDER BY CategoryNameEN, ParticularNameEN",
         [$startDate, $endDate]
     );
 
@@ -183,13 +365,8 @@ if ($generate) {
     $otherIncome = safeFloat($otherIncomeRow[0]->v ?? 0);
 
     // ── 4. CUSTOMER RECEIVABLE (outstanding dues) ─────────────────────────────
-    // trx_customerdue has no 'Amount' column; use DueAmount (remaining unpaid balance)
     $custRecRow = $objQuery->index(
         "SELECT COALESCE(SUM(DueAmount),0) AS v FROM trx_customerdue
-          WHERE IsActive=1 AND IsDeleted=0"
-    );
-    $custCollRow = $objQuery->index(
-        "SELECT COALESCE(SUM(Amount),0) AS v FROM trx_customercollection
           WHERE IsActive=1 AND IsDeleted=0"
     );
     $custReceivable = safeFloat($custRecRow[0]->v ?? 0);
@@ -207,7 +384,6 @@ if ($generate) {
                      - safeFloat($supPaidRow[0]->v ?? 0);
 
     // ── 6. CASH vs CREDIT SALES ────────────────────────────────────────────────
-    // Credit sales = customer due entries within period (TotalAmount = full sale value on credit)
     $creditRow = $objQuery->index(
         "SELECT COALESCE(SUM(TotalAmount),0) AS v FROM trx_customerdue
           WHERE TxnDate BETWEEN ? AND ? AND IsActive=1 AND IsDeleted=0",
@@ -242,8 +418,6 @@ if ($generate) {
 
     $cashSaleAmt = $totals['salesAmt'] - $creditSaleAmt;
 }
-
-// currency symbol already set by header.php via getCompanyInfo()
 ?>
 
 <!-- ═══════════════════════════════════════════════════════════════════════════
@@ -325,11 +499,11 @@ if ($generate) {
 
     <!-- Page header -->
     <div class="table-header mb-3">
-        <h5><i class="fas fa-chart-line text-primary me-2"></i>Profit / Loss Report</h5>
+        <h5><i class="fas fa-chart-line text-primary me-2"></i><?php echo htmlspecialchars($lblReportTitle); ?></h5>
         <?php if ($generate): ?>
         <div class="d-flex gap-2 no-print">
             <button onclick="window.print()" class="btn btn-sm btn-outline-secondary">
-                <i class="fas fa-print me-1"></i> Print
+                <i class="fas fa-print me-1"></i> <?php echo $lblPrint; ?>
             </button>
         </div>
         <?php endif; ?>
@@ -337,17 +511,24 @@ if ($generate) {
 
     <!-- ── Filter Form ──────────────────────────────────────────────────── -->
     <form method="GET" class="row g-3 mb-4 no-print">
-        <div class="col-md-4">
-            <label class="form-label fw-semibold"><i class="fas fa-calendar-alt me-1 text-primary"></i> From Date <span class="text-danger">*</span></label>
+        <div class="col-md-3">
+            <label class="form-label fw-semibold"><i class="fas fa-calendar-alt me-1 text-primary"></i> <?php echo $lblFromDate; ?> <span class="text-danger">*</span></label>
             <input type="date" name="start_date" id="start_date" class="form-control" value="<?php echo $startDate; ?>" required>
         </div>
-        <div class="col-md-4">
-            <label class="form-label fw-semibold"><i class="fas fa-calendar-check me-1 text-primary"></i> To Date <span class="text-danger">*</span></label>
+        <div class="col-md-3">
+            <label class="form-label fw-semibold"><i class="fas fa-calendar-check me-1 text-primary"></i> <?php echo $lblToDate; ?> <span class="text-danger">*</span></label>
             <input type="date" name="end_date" id="end_date" class="form-control" value="<?php echo $endDate; ?>" required>
         </div>
-        <div class="col-md-4 d-flex align-items-end gap-2">
+        <div class="col-md-3">
+            <label class="form-label fw-semibold"><i class="fas fa-language me-1 text-primary"></i> <?php echo $lblLanguage; ?></label>
+            <select name="lang" id="lang" class="form-select">
+                <option value="bn" <?php echo $lang === 'bn' ? 'selected' : ''; ?>>Bangla (বাংলা)</option>
+                <option value="en" <?php echo $lang === 'en' ? 'selected' : ''; ?>>English</option>
+            </select>
+        </div>
+        <div class="col-md-3 d-flex align-items-end gap-2">
             <button type="submit" name="generate" class="btn btn-primary flex-grow-1">
-                <i class="fas fa-rocket me-1"></i> Generate Report
+                <i class="fas fa-rocket me-1"></i> <?php echo $lblGenerate; ?>
             </button>
             <a href="profit_loss.php" class="btn btn-outline-secondary"><i class="fas fa-redo"></i></a>
         </div>
@@ -357,8 +538,8 @@ if ($generate) {
     <!-- ── Placeholder ──────────────────────────────────────────────── -->
     <div class="text-center py-5">
         <div style="font-size:4rem; color:#cbd5e1;"><i class="fas fa-chart-pie"></i></div>
-        <h5 class="text-muted mt-3">Select a date range and click <strong>Generate Report</strong></h5>
-        <p class="text-muted small">This report shows profit &amp; loss using the <strong>Average Cost (AVCO)</strong> method.</p>
+        <h5 class="text-muted mt-3"><?php echo $lblSelectDateRange; ?></h5>
+        <p class="text-muted small"><?php echo $lblAvcoNote; ?></p>
     </div>
 
     <?php else: /* ═══ REPORT OUTPUT ══════════════════════════════════════ */ ?>
@@ -368,15 +549,15 @@ if ($generate) {
         <div class="card-body py-3">
             <div class="row align-items-center">
                 <div class="col-md-6">
-                    <h4 class="mb-0 fw-bold"><?php echo htmlspecialchars($companyName); ?></h4>
-                    <small class="text-muted"><?php echo htmlspecialchars($company->Address ?? ''); ?></small>
+                    <h4 class="mb-0 fw-bold"><?php echo htmlspecialchars($companyNameDisplay); ?></h4>
+                    <small class="text-muted"><?php echo htmlspecialchars($companyAddressDisplay); ?></small>
                 </div>
                 <div class="col-md-6 text-md-end">
-                    <h5 class="mb-1 text-primary">Profit / Loss Report</h5>
+                    <h5 class="mb-1 text-primary"><?php echo htmlspecialchars($lblReportTitle); ?></h5>
                     <small class="text-muted">
-                        <strong>Period:</strong> <?php echo formatDate($startDate); ?> &mdash; <?php echo formatDate($endDate); ?><br>
-                        <strong>Method:</strong> Average Cost (AVCO) &nbsp;|&nbsp;
-                        <strong>Generated:</strong> <?php echo date('d-m-Y H:i'); ?>
+                        <strong><?php echo $lblPeriod; ?>:</strong> <?php echo formatDate($startDate); ?> &mdash; <?php echo formatDate($endDate); ?><br>
+                        <strong><?php echo $lblMethod; ?>:</strong> <?php echo $lang === 'en' ? 'Average Cost (AVCO)' : 'এভারেজ কস্ট (AVCO)'; ?> &nbsp;|&nbsp;
+                        <strong><?php echo $lblGenerated; ?>:</strong> <?php echo date('d-m-Y H:i'); ?>
                     </small>
                 </div>
             </div>
@@ -388,72 +569,72 @@ if ($generate) {
         <!-- Total Sales -->
         <div class="col-6 col-md-3">
             <div class="pl-metric-card grad-sales">
-                <div class="metric-label">Total Sales</div>
+                <div class="metric-label"><?php echo $lblCardTotalSales; ?></div>
                 <div class="metric-value"><?php echo $currencySymbol . ' ' . formatCurrency($totals['salesAmt']); ?></div>
-                <div class="metric-sub"><?php echo formatCurrency($totals['soldQty'], 3); ?> L sold</div>
+                <div class="metric-sub"><?php echo formatCurrency($totals['soldQty'], 3); ?> <?php echo $lblCardSoldSub; ?></div>
                 <div class="metric-icon"><i class="fas fa-dollar-sign"></i></div>
             </div>
         </div>
         <!-- Total COGS -->
         <div class="col-6 col-md-3">
             <div class="pl-metric-card grad-cost">
-                <div class="metric-label">Cost of Goods Sold</div>
+                <div class="metric-label"><?php echo $lblCardCOGS; ?></div>
                 <div class="metric-value"><?php echo $currencySymbol . ' ' . formatCurrency($totals['cogs']); ?></div>
-                <div class="metric-sub">Purchase cost: <?php echo $currencySymbol . ' ' . formatCurrency($totals['purchCost']); ?></div>
+                <div class="metric-sub"><?php echo $lblCardPurchCostSub; ?> <?php echo $currencySymbol . ' ' . formatCurrency($totals['purchCost']); ?></div>
                 <div class="metric-icon"><i class="fas fa-shopping-cart"></i></div>
             </div>
         </div>
         <!-- Gross Profit -->
         <div class="col-6 col-md-3">
             <div class="pl-metric-card grad-gross">
-                <div class="metric-label">Gross Profit</div>
+                <div class="metric-label"><?php echo $lblCardGrossProfit; ?></div>
                 <div class="metric-value"><?php echo $currencySymbol . ' ' . formatCurrency($totals['grossProfit']); ?></div>
-                <div class="metric-sub">Margin: <?php echo $totals['margin']; ?>%</div>
+                <div class="metric-sub"><?php echo $lblCardMarginSub; ?> <?php echo $totals['margin']; ?>%</div>
                 <div class="metric-icon"><i class="fas fa-chart-line"></i></div>
             </div>
         </div>
         <!-- Net Profit -->
         <div class="col-6 col-md-3">
             <div class="pl-metric-card <?php echo $totals['netProfit'] >= 0 ? 'grad-net' : 'grad-cost'; ?>">
-                <div class="metric-label">Net Profit</div>
+                <div class="metric-label"><?php echo $totals['netProfit'] >= 0 ? $lblCardNetProfit : $lblCardNetLoss; ?></div>
                 <div class="metric-value"><?php echo $currencySymbol . ' ' . formatCurrency($totals['netProfit']); ?></div>
-                <div class="metric-sub">Net margin: <?php echo $totals['netMargin']; ?>%</div>
+                <div class="metric-sub"><?php echo $lblCardNetMarginSub; ?> <?php echo $totals['netMargin']; ?>%</div>
                 <div class="metric-icon"><i class="fas fa-coins"></i></div>
             </div>
         </div>
         <!-- Closing Stock Value -->
         <div class="col-6 col-md-3">
             <div class="pl-metric-card grad-stock">
-                <div class="metric-label">Closing Stock Value</div>
+                <div class="metric-label"><?php echo $lblCardClosingVal; ?></div>
                 <div class="metric-value"><?php echo $currencySymbol . ' ' . formatCurrency($totals['closingVal']); ?></div>
-                <div class="metric-sub">Inventory at AVCO</div>
+                <div class="metric-sub"><?php echo $lblCardAvcoSub; ?></div>
                 <div class="metric-icon"><i class="fas fa-boxes"></i></div>
             </div>
         </div>
         <!-- Fuel Sold -->
         <div class="col-6 col-md-3">
             <div class="pl-metric-card grad-sold">
-                <div class="metric-label">Fuel Sold</div>
+                <div class="metric-label"><?php echo $lblCardFuelSold; ?></div>
                 <div class="metric-value"><?php echo formatCurrency($totals['soldQty'], 3); ?> L</div>
-                <div class="metric-sub">In the selected period</div>
+                <div class="metric-sub"><?php echo $lblCardPeriodSub; ?></div>
                 <div class="metric-icon"><i class="fas fa-gas-pump"></i></div>
             </div>
         </div>
         <!-- Operating Expenses -->
         <div class="col-6 col-md-3">
             <div class="pl-metric-card grad-percent">
-                <div class="metric-label">Operating Expenses</div>
+                <div class="metric-label"><?php echo $lblCardOperatingExp; ?></div>
                 <div class="metric-value"><?php echo $currencySymbol . ' ' . formatCurrency($totals['expenses']); ?></div>
-                <div class="metric-sub">Other income: <?php echo $currencySymbol . ' ' . formatCurrency($otherIncome); ?></div>
+                <div class="metric-sub"><?php echo $lblCardOtherIncSub; ?> <?php echo $currencySymbol . ' ' . formatCurrency($otherIncome); ?></div>
                 <div class="metric-icon"><i class="fas fa-receipt"></i></div>
             </div>
         </div>
         <!-- Profit % -->
         <div class="col-6 col-md-3">
             <div class="pl-metric-card grad-remain">
-                <div class="metric-label">Profit %</div>
+                <div class="metric-label"><?php echo $lblCardProfitPct; ?></div>
                 <div class="metric-value"><?php echo $totals['netMargin']; ?>%</div>
-                <div class="metric-sub">Gross: <?php echo $totals['margin']; ?>%</div>
+                <div class="metric-sub"><?php echo $lblCardGrossSub; ?> <?php echo $totals['margin']; ?>%</div>
                 <div class="metric-icon"><i class="fas fa-percentage"></i></div>
             </div>
         </div>
@@ -462,33 +643,33 @@ if ($generate) {
     <!-- ══ 1. PER-FUEL INVENTORY & PROFIT TABLE ══════════════════════════ -->
     <div class="report-section">
         <div class="section-header sh-blue">
-            <i class="fas fa-gas-pump"></i> Fuel-wise Inventory & Profit Statement
+            <i class="fas fa-gas-pump"></i> <?php echo $lblFuelSecTitle; ?>
         </div>
         <div class="table-responsive">
             <table class="table table-bordered table-hover table-sm pl-table mb-0">
                 <thead>
                     <tr>
                         <th rowspan="2" class="align-middle">#</th>
-                        <th rowspan="2" class="align-middle">Item</th>
-                        <th colspan="2" class="text-center">Opening Stock</th>
-                        <th colspan="2" class="text-center">Purchase</th>
-                        <th class="text-center">Total Available</th>
-                        <th class="text-center">Sold Qty</th>
-                        <th colspan="2" class="text-center">Closing Stock</th>
-                        <th class="text-center">COGS</th>
-                        <th class="text-center">Sales Amt</th>
-                        <th class="text-center">Gross Profit</th>
-                        <th class="text-center">Margin</th>
+                        <th rowspan="2" class="align-middle"><?php echo $lblThItem; ?></th>
+                        <th colspan="2" class="text-center"><?php echo $lblThOpenStock; ?></th>
+                        <th colspan="2" class="text-center"><?php echo $lblThPurchase; ?></th>
+                        <th class="text-center"><?php echo $lblThTotAvailable; ?></th>
+                        <th class="text-center"><?php echo $lblThSoldQty; ?></th>
+                        <th colspan="2" class="text-center"><?php echo $lblThClosingStock; ?></th>
+                        <th class="text-center"><?php echo $lblThCOGS; ?></th>
+                        <th class="text-center"><?php echo $lblThSalesAmt; ?></th>
+                        <th class="text-center"><?php echo $lblThGrossProfit; ?></th>
+                        <th class="text-center"><?php echo $lblThMargin; ?></th>
                     </tr>
                     <tr>
-                        <th class="text-end">Qty (L)</th>
-                        <th class="text-end">Value (<?php echo $currencySymbol; ?>)</th>
-                        <th class="text-end">Qty (L)</th>
-                        <th class="text-end">Cost (<?php echo $currencySymbol; ?>)</th>
-                        <th class="text-end">Qty (L)</th>
-                        <th class="text-end">Qty (L)</th>
-                        <th class="text-end">Qty (L)</th>
-                        <th class="text-end">Value (<?php echo $currencySymbol; ?>)</th>
+                        <th class="text-end"><?php echo $lblThQtyL; ?></th>
+                        <th class="text-end"><?php echo $lblThValue; ?></th>
+                        <th class="text-end"><?php echo $lblThQtyL; ?></th>
+                        <th class="text-end"><?php echo $lblThCost; ?></th>
+                        <th class="text-end"><?php echo $lblThQtyL; ?></th>
+                        <th class="text-end"><?php echo $lblThQtyL; ?></th>
+                        <th class="text-end"><?php echo $lblThQtyL; ?></th>
+                        <th class="text-end"><?php echo $lblThValue; ?></th>
                         <th class="text-end"><?php echo $currencySymbol; ?></th>
                         <th class="text-end"><?php echo $currencySymbol; ?></th>
                         <th class="text-end"><?php echo $currencySymbol; ?></th>
@@ -497,7 +678,7 @@ if ($generate) {
                 </thead>
                 <tbody>
                     <?php if (empty($fuelRows)): ?>
-                    <tr><td colspan="14" class="text-center text-muted py-3">No data found for the selected period.</td></tr>
+                    <tr><td colspan="14" class="text-center text-muted py-3"><?php echo $lblNoData; ?></td></tr>
                     <?php else: $sl = 1; foreach ($fuelRows as $r): ?>
                     <tr>
                         <td><?php echo $sl++; ?></td>
@@ -526,7 +707,7 @@ if ($generate) {
                 <?php if (!empty($fuelRows)): ?>
                 <tfoot>
                     <tr>
-                        <td colspan="2" class="text-end fw-bold">TOTAL</td>
+                        <td colspan="2" class="text-end fw-bold"><?php echo $lblTotal; ?></td>
                         <td class="text-end fw-bold">&mdash;</td>
                         <td class="text-end fw-bold"><?php echo formatCurrency($totals['openVal']); ?></td>
                         <td class="text-end fw-bold"><?php echo formatCurrency($totals['purchQty'], 3); ?></td>
@@ -556,24 +737,26 @@ if ($generate) {
     <?php if (!empty($expenseDetail)): ?>
     <div class="report-section">
         <div class="section-header sh-red">
-            <i class="fas fa-receipt"></i> Operating Expenses Breakdown
+            <i class="fas fa-receipt"></i> <?php echo $lblExpSecTitle; ?>
         </div>
         <div class="table-responsive">
             <table class="table table-bordered table-hover table-sm pl-table mb-0">
                 <thead>
                     <tr>
                         <th>#</th>
-                        <th>Category</th>
-                        <th>Particular</th>
-                        <th class="text-center">Entries</th>
-                        <th class="text-end">Amount (<?php echo $currencySymbol; ?>)</th>
+                        <th><?php echo $lblThCategory; ?></th>
+                        <th><?php echo $lblThParticular; ?></th>
+                        <th class="text-center"><?php echo $lblThEntries; ?></th>
+                        <th class="text-end"><?php echo $lblThAmount; ?></th>
                     </tr>
                 </thead>
                 <tbody>
                     <?php $sl = 1; $prevCat = ''; foreach ($expenseDetail as $r): ?>
-                    <?php $cat = htmlspecialchars($r->Category ?? 'Uncategorized'); ?>
-                    <?php if ($cat !== $prevCat && $prevCat !== ''): ?>
-                    <?php endif; ?>
+                    <?php 
+                        $catName = $lang === 'bn' ? (!empty($r->CategoryNameBN) ? $r->CategoryNameBN : ($r->CategoryNameEN ?? 'অন্যান্য')) : (!empty($r->CategoryNameEN) ? $r->CategoryNameEN : ($r->CategoryNameBN ?? 'Uncategorized'));
+                        $partName = $lang === 'bn' ? (!empty($r->ParticularNameBN) ? $r->ParticularNameBN : ($r->ParticularNameEN ?? '—')) : (!empty($r->ParticularNameEN) ? $r->ParticularNameEN : ($r->ParticularNameBN ?? '—'));
+                        $cat = htmlspecialchars($catName); 
+                    ?>
                     <tr <?php if ($cat !== $prevCat): ?>class="table-active"<?php endif; ?>>
                         <td><?php echo $sl++; ?></td>
                         <td>
@@ -582,7 +765,7 @@ if ($generate) {
                                 echo '<span class="badge bg-secondary">' . $cat . '</span>';
                             endif; ?>
                         </td>
-                        <td><?php echo htmlspecialchars($r->Particular ?? '—'); ?></td>
+                        <td><?php echo htmlspecialchars($partName); ?></td>
                         <td class="text-center"><?php echo $r->Cnt; ?></td>
                         <td class="text-end text-danger fw-semibold"><?php echo formatCurrency($r->Total); ?></td>
                     </tr>
@@ -590,7 +773,7 @@ if ($generate) {
                 </tbody>
                 <tfoot>
                     <tr>
-                        <td colspan="4" class="text-end fw-bold">Total Expenses:</td>
+                        <td colspan="4" class="text-end fw-bold"><?php echo $lblTotalExpenses; ?></td>
                         <td class="text-end fw-bold text-danger"><?php echo formatCurrency($totals['expenses']); ?></td>
                     </tr>
                 </tfoot>
@@ -602,20 +785,20 @@ if ($generate) {
     <!-- ══ 3. CASH vs CREDIT SALES ════════════════════════════════════════ -->
     <div class="report-section">
         <div class="section-header sh-teal">
-            <i class="fas fa-exchange-alt"></i> Sales Analysis — Cash vs Credit
+            <i class="fas fa-exchange-alt"></i> <?php echo $lblSalesAnalysisTitle; ?>
         </div>
         <div class="table-responsive">
             <table class="table table-bordered table-sm pl-table mb-0">
                 <thead>
                     <tr>
-                        <th>Description</th>
-                        <th class="text-end">Amount (<?php echo $currencySymbol; ?>)</th>
-                        <th class="text-end">% of Total Sales</th>
+                        <th><?php echo $lblThDescription; ?></th>
+                        <th class="text-end"><?php echo $lblThAmount; ?></th>
+                        <th class="text-end"><?php echo $lblThPctTotal; ?></th>
                     </tr>
                 </thead>
                 <tbody>
                     <tr>
-                        <td><i class="fas fa-money-bill-wave text-success me-1"></i> Cash Sales</td>
+                        <td><i class="fas fa-money-bill-wave text-success me-1"></i> <?php echo $lblCashSales; ?></td>
                         <td class="text-end"><?php echo formatCurrency($cashSaleAmt); ?></td>
                         <td class="text-end">
                             <?php $pct = $totals['salesAmt'] > 0 ? round(($cashSaleAmt/$totals['salesAmt'])*100,1) : 0; ?>
@@ -623,7 +806,7 @@ if ($generate) {
                         </td>
                     </tr>
                     <tr>
-                        <td><i class="fas fa-file-invoice text-warning me-1"></i> Credit Sales</td>
+                        <td><i class="fas fa-file-invoice text-warning me-1"></i> <?php echo $lblCreditSales; ?></td>
                         <td class="text-end"><?php echo formatCurrency($creditSaleAmt); ?></td>
                         <td class="text-end">
                             <?php $pct2 = $totals['salesAmt'] > 0 ? round(($creditSaleAmt/$totals['salesAmt'])*100,1) : 0; ?>
@@ -633,7 +816,7 @@ if ($generate) {
                 </tbody>
                 <tfoot>
                     <tr>
-                        <td class="fw-bold">Total Sales</td>
+                        <td class="fw-bold"><?php echo $lblCardTotalSales; ?></td>
                         <td class="text-end fw-bold text-primary"><?php echo formatCurrency($totals['salesAmt']); ?></td>
                         <td class="text-end fw-bold">100%</td>
                     </tr>
@@ -648,19 +831,19 @@ if ($generate) {
         <div class="col-md-6">
             <div class="report-section h-100">
                 <div class="section-header sh-purple">
-                    <i class="fas fa-balance-scale"></i> Profit &amp; Loss Summary
+                    <i class="fas fa-balance-scale"></i> <?php echo $lblPLSummaryTitle; ?>
                 </div>
                 <div class="p-3">
                     <div class="summary-line">
-                        <span><i class="fas fa-arrow-up text-success me-2"></i>Total Sales</span>
+                        <span><i class="fas fa-arrow-up text-success me-2"></i><?php echo $lblCardTotalSales; ?></span>
                         <strong class="text-primary"><?php echo $currencySymbol . ' ' . formatCurrency($totals['salesAmt']); ?></strong>
                     </div>
                     <div class="summary-line">
-                        <span><i class="fas fa-minus-circle text-danger me-2"></i>Cost of Goods Sold (COGS)</span>
+                        <span><i class="fas fa-minus-circle text-danger me-2"></i><?php echo $lblCardCOGS; ?></span>
                         <strong class="text-danger">(-) <?php echo $currencySymbol . ' ' . formatCurrency($totals['cogs']); ?></strong>
                     </div>
                     <div class="summary-line <?php echo $totals['grossProfit'] >= 0 ? 'total-line' : 'loss-line'; ?>">
-                        <span><i class="fas fa-chart-bar me-2"></i>Gross Profit</span>
+                        <span><i class="fas fa-chart-bar me-2"></i><?php echo $lblCardGrossProfit; ?></span>
                         <strong class="<?php echo $totals['grossProfit'] >= 0 ? 'text-success' : 'text-danger'; ?>">
                             <?php echo $currencySymbol . ' ' . formatCurrency($totals['grossProfit']); ?>
                             <small>(<?php echo $totals['margin']; ?>%)</small>
@@ -669,17 +852,17 @@ if ($generate) {
 
                     <div class="mt-3">
                         <div class="summary-line">
-                            <span><i class="fas fa-minus-circle text-danger me-2"></i>Operating Expenses</span>
+                            <span><i class="fas fa-minus-circle text-danger me-2"></i><?php echo $lblCardOperatingExp; ?></span>
                             <strong class="text-danger">(-) <?php echo $currencySymbol . ' ' . formatCurrency($totals['expenses']); ?></strong>
                         </div>
                         <div class="summary-line">
-                            <span><i class="fas fa-plus-circle text-success me-2"></i>Other Income</span>
+                            <span><i class="fas fa-plus-circle text-success me-2"></i><?php echo $lblOtherIncome; ?></span>
                             <strong class="text-success">(+) <?php echo $currencySymbol . ' ' . formatCurrency($otherIncome); ?></strong>
                         </div>
                     </div>
 
                     <div class="summary-line <?php echo $totals['netProfit'] >= 0 ? 'total-line' : 'loss-line'; ?> mt-2" style="font-size:1.05rem;">
-                        <span><i class="fas fa-coins me-2"></i><?php echo $totals['netProfit'] >= 0 ? 'Net Profit' : 'Net Loss'; ?></span>
+                        <span><i class="fas fa-coins me-2"></i><?php echo $totals['netProfit'] >= 0 ? $lblCardNetProfit : $lblCardNetLoss; ?></span>
                         <strong class="<?php echo $totals['netProfit'] >= 0 ? 'text-success' : 'text-danger'; ?>">
                             <?php echo $currencySymbol . ' ' . formatCurrency(abs($totals['netProfit'])); ?>
                             <small>(<?php echo $totals['netMargin']; ?>%)</small>
@@ -687,7 +870,7 @@ if ($generate) {
                     </div>
 
                     <div class="summary-line mt-2">
-                        <span><i class="fas fa-boxes text-warning me-2"></i>Closing Stock Value</span>
+                        <span><i class="fas fa-boxes text-warning me-2"></i><?php echo $lblCardClosingVal; ?></span>
                         <strong class="text-warning"><?php echo $currencySymbol . ' ' . formatCurrency($totals['closingVal']); ?></strong>
                     </div>
                 </div>
@@ -698,35 +881,35 @@ if ($generate) {
         <div class="col-md-6">
             <div class="report-section h-100">
                 <div class="section-header sh-orange">
-                    <i class="fas fa-university"></i> Balance Sheet Highlights
+                    <i class="fas fa-university"></i> <?php echo $lblBSHighlightsTitle; ?>
                 </div>
                 <div class="p-3">
                     <div class="summary-line">
-                        <span><i class="fas fa-user-friends text-primary me-2"></i>Customer Receivable</span>
+                        <span><i class="fas fa-user-friends text-primary me-2"></i><?php echo $lblCustReceivable; ?></span>
                         <strong class="text-primary"><?php echo $currencySymbol . ' ' . formatCurrency(max(0, $custReceivable)); ?></strong>
                     </div>
                     <div class="summary-line">
-                        <span><i class="fas fa-truck text-danger me-2"></i>Supplier Payable</span>
+                        <span><i class="fas fa-truck text-danger me-2"></i><?php echo $lblSupplierPayable; ?></span>
                         <strong class="text-danger"><?php echo $currencySymbol . ' ' . formatCurrency(max(0, $supplierPayable)); ?></strong>
                     </div>
                     <div class="summary-line">
-                        <span><i class="fas fa-money-bill-wave text-success me-2"></i>Cash Sales Amount</span>
+                        <span><i class="fas fa-money-bill-wave text-success me-2"></i><?php echo $lblCashSalesAmt; ?></span>
                         <strong class="text-success"><?php echo $currencySymbol . ' ' . formatCurrency($cashSaleAmt); ?></strong>
                     </div>
                     <div class="summary-line">
-                        <span><i class="fas fa-file-invoice text-warning me-2"></i>Credit Sales Amount</span>
+                        <span><i class="fas fa-file-invoice text-warning me-1"></i><?php echo $lblCreditSalesAmt; ?></span>
                         <strong class="text-warning"><?php echo $currencySymbol . ' ' . formatCurrency($creditSaleAmt); ?></strong>
                     </div>
                     <div class="summary-line">
-                        <span><i class="fas fa-shopping-cart text-secondary me-2"></i>Total Purchase (Period)</span>
+                        <span><i class="fas fa-shopping-cart text-secondary me-2"></i><?php echo $lblTotalPurchPeriod; ?></span>
                         <strong><?php echo $currencySymbol . ' ' . formatCurrency($totals['purchCost']); ?></strong>
                     </div>
                     <div class="summary-line">
-                        <span><i class="fas fa-tachometer-alt text-info me-2"></i>Fuel Sold (Period)</span>
+                        <span><i class="fas fa-tachometer-alt text-info me-2"></i><?php echo $lblFuelSoldPeriod; ?></span>
                         <strong><?php echo formatCurrency($totals['soldQty'], 3); ?> L</strong>
                     </div>
                     <div class="summary-line">
-                        <span><i class="fas fa-oil-can text-warning me-2"></i>Opening Stock Value</span>
+                        <span><i class="fas fa-oil-can text-warning me-2"></i><?php echo $lblOpenStockValue; ?></span>
                         <strong><?php echo $currencySymbol . ' ' . formatCurrency($totals['openVal']); ?></strong>
                     </div>
                 </div>
@@ -738,12 +921,12 @@ if ($generate) {
     <div class="alert alert-info d-flex gap-3 align-items-start no-print">
         <i class="fas fa-info-circle mt-1" style="font-size:1.2rem;"></i>
         <div>
-            <strong>Costing Method: Average Cost (AVCO)</strong><br>
+            <strong><?php echo $lblCostingMethod; ?></strong><br>
             <small>
-                <strong>Opening Stock Value</strong> = Opening Qty × Weighted Avg Cost per litre (up to day before period)<br>
-                <strong>COGS</strong> = Opening Stock Value + Purchase Cost − Closing Stock Value<br>
-                <strong>Gross Profit</strong> = Sales Amount − COGS<br>
-                <strong>Net Profit</strong> = Gross Profit − Operating Expenses + Other Income
+                <strong><?php echo $lang === 'en' ? 'Opening Stock Value' : 'প্রারম্ভিক মজুদের মূল্য'; ?></strong> = <?php echo $lblNoteOpenStock; ?><br>
+                <strong><?php echo $lblThCOGS; ?></strong> = <?php echo $lblNoteCOGS; ?><br>
+                <strong><?php echo $lblCardGrossProfit; ?></strong> = <?php echo $lblNoteGrossProfit; ?><br>
+                <strong><?php echo $lblCardNetProfit; ?></strong> = <?php echo $lblNoteNetProfit; ?>
             </small>
         </div>
     </div>

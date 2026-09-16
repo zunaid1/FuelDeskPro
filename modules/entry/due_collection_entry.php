@@ -19,6 +19,7 @@ function handleSave() {
     $ref = sanitize($_POST['reference_no'] ?? '');
     $remarks = sanitize($_POST['remarks'] ?? '');
     if (empty($date) || !$customer || $amount <= 0 || !$method) jsonResponse(false, 'Required fields missing!');
+    if (isStatementClosed($date)) jsonResponse(false, 'এই তারিখের ('.date('d-m-Y', strtotime($date)).') হিসাবটি ইতোমধ্যে ফাইনাল সাবমিট (ক্লোজ) করা হয়েছে! নতুন ডাটা সেভ বা আপডেট করা সম্ভব নয়।');
     if ($id > 0) {
         $objQuery->inUpDel("UPDATE trx_customercollection SET TxnDate=?, CustomerID=?, Amount=?, PaymentMethodID=?, ReferenceNo=?, Remarks=?, UpdatedBy=?, UpdatedAt=NOW() WHERE CustomerCollectionID=? AND IsDeleted=0", [$date, $customer, $amount, $method, $ref, $remarks, getUserId(), $id]);
         jsonResponse(true, 'Collection updated successfully!');
@@ -30,6 +31,10 @@ function handleSave() {
 function handleDelete() {
     global $objQuery; $id = intval($_POST['record_id'] ?? 0);
     if ($id <= 0) jsonResponse(false, 'Invalid ID!');
+    $rec = $objQuery->index("SELECT TxnDate FROM trx_customercollection WHERE CustomerCollectionID=?", [$id]);
+    if (!empty($rec) && isStatementClosed($rec[0]->TxnDate)) {
+        jsonResponse(false, 'এই তারিখের ('.date('d-m-Y', strtotime($rec[0]->TxnDate)).') হিসাবটি ইতোমধ্যে ফাইনাল সাবমিট (ক্লোজ) করা হয়েছে! এই তারিখের ডাটা মোছা সম্ভব নয়।');
+    }
     $objQuery->inUpDel("UPDATE trx_customercollection SET IsDeleted=1, UpdatedBy=?, UpdatedAt=NOW() WHERE CustomerCollectionID=?", [getUserId(), $id]);
     jsonResponse(true, 'Collection deleted successfully!');
 }

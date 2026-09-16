@@ -7,6 +7,11 @@ $particulars = $objQuery->index("SELECT ExpenseParticularID, ParticularID, Parti
 $methods = $objQuery->index("SELECT PaymentMethodID, MethodName FROM cfg_paymentmethod WHERE IsActive=1 AND IsDeleted=0");
 $data = $objQuery->index("SELECT oc.*, ep.ParticularNameEN, pm.MethodName FROM trx_otherscollection oc LEFT JOIN mst_expenseparticular ep ON oc.ParticularID=ep.ExpenseParticularID LEFT JOIN cfg_paymentmethod pm ON oc.PaymentMethodID=pm.PaymentMethodID WHERE oc.IsDeleted=0 ORDER BY oc.CollectionDate DESC, oc.OthersCollectionID DESC");
 ?>
+<?php if (isStatementClosed(today())): ?>
+<div class="alert alert-danger shadow-sm border-danger text-center fw-bold fs-6 mb-3 py-2">
+    <i class="fas fa-lock me-2"></i> আজকের তারিখের (<?php echo date('d-m-Y'); ?>) হিসাবটি ইতোমধ্যে ক্লোজ করা হয়েছে
+</div>
+<?php endif; ?>
 <div class="table-container">
     <div class="table-header"><h5><i class="fas fa-coins text-primary me-2"></i>Others Collections</h5>
         <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addModal"><i class="fas fa-plus"></i> Add New</button></div>
@@ -45,8 +50,10 @@ $data = $objQuery->index("SELECT oc.*, ep.ParticularNameEN, pm.MethodName FROM t
                     <?php foreach($methods as $m): ?><option value="<?php echo $m->PaymentMethodID; ?>"><?php echo htmlspecialchars($m->MethodName); ?></option><?php endforeach; ?></select></div>
                 <div class="col-md-4 mb-3"><label class="form-label">Reference No</label><input type="text" name="reference_no" id="reference_no" class="form-control"></div>
             </div>
-            <div class="mb-3"><label class="form-label">Narration</label><textarea name="narration" id="narration" class="form-control" rows="2"></textarea></div>
-            <div class="mb-3"><label class="form-label">Remarks</label><textarea name="remarks" id="remarks" class="form-control" rows="2"></textarea></div>
+            <div class="row">
+                <div class="col-md-6 mb-3"><label class="form-label">Narration</label><input type="text" name="narration" id="narration" class="form-control"></div>
+                <div class="col-md-6 mb-3"><label class="form-label">Remarks</label><input type="text" name="remarks" id="remarks" class="form-control"></div>
+            </div>
         </div>
         <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-primary"><i class="fas fa-save me-1"></i> Save</button></div>
     </form>

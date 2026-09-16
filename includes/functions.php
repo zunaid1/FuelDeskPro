@@ -5,6 +5,9 @@
  * @package FuelDeskPro
  */
 
+// Set default system timezone
+date_default_timezone_set('Asia/Dhaka');
+
 /**
  * Get global database object
  * 
@@ -29,12 +32,58 @@ function getCompanyInfo($key = null)
     
     if (!empty($data)) {
         $company = $data[0];
+        if (empty($company->CompanyNameBN)) {
+            db()->inUpDel("UPDATE cfg_companyprofile SET CompanyNameBN = ? WHERE CompanyID = 1", ['সাঙ্গু এল.পি.জি ফিলিং ষ্টেশন']);
+            $company->CompanyNameBN = 'সাঙ্গু এল.পি.জি ফিলিং ষ্টেশন';
+        }
         if ($key && isset($company->$key)) {
             return $company->$key;
         }
         return $company;
     }
     return null;
+}
+
+/**
+ * Get formatted company profile info array based on selected language
+ * 
+ * @param string $lang 'bn' or 'en'
+ * @return array
+ */
+function getFormattedCompanyInfo($lang = 'bn')
+{
+    $company = getCompanyInfo();
+    if (!$company) {
+        return [
+            'name'    => ($lang === 'en' ? 'Shangu LPG Filling Station' : 'সাঙ্গু এল.পি.জি ফিলিং ষ্টেশন'),
+            'address' => ($lang === 'en' ? 'Amilaish, Satkania, Chattogram.' : 'আমিলাইশ, সাতকানিয়া, চট্টগ্রাম।'),
+            'mobile'  => '01819800600',
+            'email'   => 'sfs@gmail.com',
+            'raw'     => null
+        ];
+    }
+
+    if ($lang === 'en') {
+        $name    = !empty($company->CompanyName) ? $company->CompanyName : 'Shangu LPG Filling Station';
+        $address = !empty($company->AddressEN) ? $company->AddressEN : (!empty($company->Address) ? $company->Address : 'Amilaish, Satkania, Chattogram.');
+        $mobile  = $company->MobileNo ?? ($company->PhoneNo ?? '');
+        $email   = $company->Email ?? '';
+    } else {
+        $name    = !empty($company->CompanyNameBN) ? $company->CompanyNameBN : 'সাঙ্গু এল.পি.জি ফিলিং ষ্টেশন';
+        $address = !empty($company->AddressBN) ? $company->AddressBN : (!empty($company->Address) ? $company->Address : 'আমিলাইশ, সাতকানিয়া, চট্টগ্রাম।');
+        
+        $rawMobile = $company->MobileNo ?? ($company->PhoneNo ?? '');
+        $mobile    = strtr((string)$rawMobile, ['0'=>'০','1'=>'১','2'=>'২','3'=>'৩','4'=>'৪','5'=>'৫','6'=>'৬','7'=>'৭','8'=>'৮','9'=>'৯']);
+        $email     = $company->Email ?? '';
+    }
+
+    return [
+        'name'    => $name,
+        'address' => $address,
+        'mobile'  => $mobile,
+        'email'   => $email,
+        'raw'     => $company
+    ];
 }
 
 /**
@@ -346,6 +395,16 @@ function t($key)
             'Particular Group (Expense Category) Management' => 'Particular Group (Expense Category) Management',
             'Particular Group / Expense Category' => 'Particular Group / Expense Category',
             'Expense Particular Management' => 'Expense Particular Management',
+            'System Settings' => 'System Settings',
+            'Daily Statement Closing Status' => 'Daily Statement Closing Status',
+            'Stock Summary' => 'Stock Summary',
+            'Stock Adjustment' => 'Stock Adjustment',
+            'Opening Stock' => 'Opening Stock',
+            'Stock IN (Purchases)' => 'Stock IN (Purchases)',
+            'Sales (Stock Out)' => 'Sales (Stock Out)',
+            'Stock Add (Adjustment)' => 'Stock Add (Adjustment)',
+            'Stock Deduct (Adjustment)' => 'Stock Deduct (Adjustment)',
+            'Current Stock' => 'Current Stock',
         ],
         'bn' => [
             'Dashboard' => 'ড্যাশবোর্ড',
@@ -353,6 +412,16 @@ function t($key)
             'Operations' => 'অপারেশন',
             'Reports' => 'রিপোর্ট',
             'Settings' => 'সেটিংস',
+            'System Settings' => 'সিস্টেম সেটিংস',
+            'Daily Statement Closing Status' => 'ডেইলি স্টেটমেন্ট ক্লোজিং স্ট্যাটাস',
+            'Stock Summary' => 'স্টক সামারি',
+            'Stock Adjustment' => 'স্টক এডজাস্টমেন্ট',
+            'Opening Stock' => 'ওপেনিং স্টক',
+            'Stock IN (Purchases)' => 'স্টক ইন (ক্রয়)',
+            'Sales (Stock Out)' => 'বিক্রয় (স্টক আউট)',
+            'Stock Add (Adjustment)' => 'স্টক যুক্ত (সমন্বয়)',
+            'Stock Deduct (Adjustment)' => 'স্টক কর্তন (সমন্বয়)',
+            'Current Stock' => 'বর্তমান স্টক',
             'Fuel Station Management' => 'ফুয়েল স্টেশন ম্যানেজমেন্ট',
             'Logout' => 'লগআউট',
             'Profile' => 'প্রোফাইল',
@@ -408,3 +477,197 @@ function t($key)
     $lang = currentLang();
     return $translations[$lang][$key] ?? $key;
 }
+
+/**
+ * Ensure trx_finalsubmit table exists
+ */
+function ensureFinalSubmitTableExists()
+{
+    static $checked = false;
+    if ($checked) return;
+    $checked = true;
+
+    $sql = "CREATE TABLE IF NOT EXISTS `trx_finalsubmit` (
+      `FinalSubmitID` int(11) NOT NULL AUTO_INCREMENT,
+      `StatementDate` date NOT NULL,
+      `IsClosed` tinyint(1) NOT NULL DEFAULT 1,
+      `SubmittedAt` datetime NOT NULL DEFAULT current_timestamp(),
+      `SubmittedBy` int(11) DEFAULT NULL,
+      `ReopenedAt` datetime DEFAULT NULL,
+      `ReopenedBy` int(11) DEFAULT NULL,
+      `Remarks` varchar(255) DEFAULT NULL,
+      `CreatedAt` datetime NOT NULL DEFAULT current_timestamp(),
+      `UpdatedAt` datetime NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+      PRIMARY KEY (`FinalSubmitID`),
+      UNIQUE KEY `idx_statementdate` (`StatementDate`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;";
+
+    try {
+        db()->inUpDel($sql);
+    } catch (\Throwable $e) {
+        // Table creation fallback
+    }
+}
+
+/**
+ * Check if daily statement for a given date is final submitted/closed
+ * 
+ * @param string $date Date in Y-m-d format
+ * @return bool
+ */
+function isStatementClosed($date)
+{
+    if (empty($date)) return false;
+    ensureFinalSubmitTableExists();
+    $d = date('Y-m-d', strtotime($date));
+    $sql = "SELECT IsClosed FROM trx_finalsubmit WHERE StatementDate = ?";
+    $res = db()->index($sql, [$d]);
+    if (!empty($res)) {
+        return intval($res[0]->IsClosed) === 1;
+    }
+    return false;
+}
+
+/**
+ * Get final submit / close details for a given date
+ * 
+ * @param string $date Date in Y-m-d format
+ * @return object|null
+ */
+function getStatementCloseInfo($date)
+{
+    if (empty($date)) return null;
+    ensureFinalSubmitTableExists();
+    $d = date('Y-m-d', strtotime($date));
+    $sql = "SELECT fs.*, u.NameEN AS SubmittedByName, u2.NameEN AS ReopenedByName 
+            FROM trx_finalsubmit fs
+            LEFT JOIN mst_employee u ON fs.SubmittedBy = u.Id
+            LEFT JOIN mst_employee u2 ON fs.ReopenedBy = u2.Id
+            WHERE fs.StatementDate = ?";
+    $res = db()->index($sql, [$d]);
+    if (!empty($res)) {
+        return $res[0];
+    }
+    return null;
+}
+
+/**
+ * Ensure trx_purchase_details and trx_stock_in tables exist, and alter trx_fuelpurchase if needed
+ */
+function ensureFuelPurchaseTablesExist()
+{
+    static $checked = false;
+    if ($checked) return;
+    $checked = true;
+
+    $sqlDetails = "CREATE TABLE IF NOT EXISTS `trx_purchase_details` (
+      `PurchaseDetailID` int(11) NOT NULL AUTO_INCREMENT,
+      `FuelPurchaseID` int(11) NOT NULL,
+      `FuelTypeID` int(11) NOT NULL,
+      `TankID` int(11) NOT NULL,
+      `Quantity` decimal(14,3) NOT NULL DEFAULT 0.000,
+      `Rate` decimal(14,2) NOT NULL DEFAULT 0.00,
+      `Amount` decimal(14,2) NOT NULL DEFAULT 0.00,
+      `Remarks` varchar(255) DEFAULT NULL,
+      `IsActive` tinyint(1) NOT NULL DEFAULT 1,
+      `IsDeleted` tinyint(1) NOT NULL DEFAULT 0,
+      PRIMARY KEY (`PurchaseDetailID`),
+      KEY `idx_fuel_purchase` (`FuelPurchaseID`),
+      KEY `idx_fuel_type` (`FuelTypeID`),
+      KEY `idx_tank` (`TankID`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;";
+
+    $sqlStockIn = "CREATE TABLE IF NOT EXISTS `trx_stock_in` (
+      `StockInID` int(11) NOT NULL AUTO_INCREMENT,
+      `StockInDate` date NOT NULL,
+      `ReferenceType` varchar(50) NOT NULL DEFAULT 'FuelPurchase',
+      `ReferenceID` int(11) NOT NULL,
+      `ReferenceDetailID` int(11) DEFAULT NULL,
+      `FuelTypeID` int(11) NOT NULL,
+      `TankID` int(11) NOT NULL,
+      `Quantity` decimal(14,3) NOT NULL DEFAULT 0.000,
+      `UnitRate` decimal(14,2) NOT NULL DEFAULT 0.00,
+      `TotalValue` decimal(14,2) NOT NULL DEFAULT 0.00,
+      `Remarks` varchar(255) DEFAULT NULL,
+      `CreatedBy` int(11) DEFAULT NULL,
+      `CreatedAt` datetime NOT NULL DEFAULT current_timestamp(),
+      `UpdatedBy` int(11) DEFAULT NULL,
+      `UpdatedAt` datetime NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+      `IsActive` tinyint(1) NOT NULL DEFAULT 1,
+      `IsDeleted` tinyint(1) NOT NULL DEFAULT 0,
+      PRIMARY KEY (`StockInID`),
+      KEY `idx_ref` (`ReferenceType`, `ReferenceID`),
+      KEY `idx_fuel_tank` (`FuelTypeID`, `TankID`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;";
+
+    try {
+        db()->inUpDel($sqlDetails);
+        db()->inUpDel($sqlStockIn);
+        db()->inUpDel("ALTER TABLE `trx_fuelpurchase` MODIFY COLUMN `FuelTypeID` int(11) NULL, MODIFY COLUMN `TankID` int(11) NULL");
+    } catch (\Throwable $e) {
+        // Table creation fallback
+    }
+
+    ensureStockAdjustmentTableExist();
+}
+
+/**
+ * Ensure trx_stockadjustment table exists
+ */
+function ensureStockAdjustmentTableExist()
+{
+    static $checked = false;
+    if ($checked) return;
+    $checked = true;
+
+    $sqlAdj = "CREATE TABLE IF NOT EXISTS `trx_stockadjustment` (
+      `AdjustmentID` int(11) NOT NULL AUTO_INCREMENT,
+      `AdjustmentDate` date NOT NULL,
+      `AdjustmentType` varchar(20) NOT NULL DEFAULT 'Stock IN',
+      `FuelTypeID` int(11) DEFAULT NULL,
+      `TankID` int(11) NOT NULL,
+      `Quantity` decimal(14,3) NOT NULL DEFAULT 0.000,
+      `UnitRate` decimal(14,2) NOT NULL DEFAULT 0.00,
+      `TotalValue` decimal(14,2) NOT NULL DEFAULT 0.00,
+      `Reason` varchar(100) DEFAULT NULL,
+      `AdjustmentReason` varchar(100) DEFAULT NULL,
+      `Remarks` varchar(255) DEFAULT NULL,
+      `CreatedBy` int(11) DEFAULT NULL,
+      `CreatedAt` datetime NOT NULL DEFAULT current_timestamp(),
+      `UpdatedBy` int(11) DEFAULT NULL,
+      `UpdatedAt` datetime NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+      `IsActive` tinyint(1) NOT NULL DEFAULT 1,
+      `IsDeleted` tinyint(1) NOT NULL DEFAULT 0,
+      PRIMARY KEY (`AdjustmentID`),
+      KEY `idx_adj_date` (`AdjustmentDate`),
+      KEY `idx_tank` (`TankID`),
+      KEY `idx_adj_type` (`AdjustmentType`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;";
+
+    try {
+        db()->inUpDel($sqlAdj);
+    } catch (\Throwable $e) {
+        // Table creation fallback
+    }
+
+    try {
+        $cols = db()->index("SHOW COLUMNS FROM `trx_stockadjustment`");
+        $colNames = [];
+        foreach ($cols as $c) {
+            $colNames[] = is_object($c) ? ($c->Field ?? '') : ($c['Field'] ?? '');
+        }
+
+        if (!in_array('Reason', $colNames)) {
+            try { db()->inUpDel("ALTER TABLE `trx_stockadjustment` ADD COLUMN `Reason` varchar(100) DEFAULT NULL AFTER `TotalValue`"); } catch (\Throwable $e) {}
+        }
+        if (!in_array('AdjustmentReason', $colNames)) {
+            try { db()->inUpDel("ALTER TABLE `trx_stockadjustment` ADD COLUMN `AdjustmentReason` varchar(100) DEFAULT NULL"); } catch (\Throwable $e) {}
+        }
+        if (!in_array('FuelTypeID', $colNames)) {
+            try { db()->inUpDel("ALTER TABLE `trx_stockadjustment` ADD COLUMN `FuelTypeID` int(11) DEFAULT NULL"); } catch (\Throwable $e) {}
+        }
+    } catch (\Throwable $e) {
+        // Safe fallback
+    }
+}
+

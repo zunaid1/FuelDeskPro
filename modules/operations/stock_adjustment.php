@@ -4,6 +4,8 @@ require_once __DIR__ . '/../../includes/auth_check.php';
 require_once __DIR__ . '/../../includes/header.php';
 require_once __DIR__ . '/../../includes/sidebar.php';
 
+ensureStockAdjustmentTableExist();
+
 $tanks = $objQuery->index("
     SELECT t.TankID, t.TankName, ft.FuelName, t.Capacity
     FROM mst_tank t
@@ -13,18 +15,22 @@ $tanks = $objQuery->index("
 ");
 
 $data = $objQuery->index("
-    SELECT sa.*, t.TankName, ft.FuelName
+    SELECT sa.*, 
+           sa.AdjustmentID AS StockAdjustmentID, 
+           COALESCE(sa.Reason, sa.AdjustmentReason, '') AS Reason, 
+           t.TankName, 
+           ft.FuelName
     FROM trx_stockadjustment sa
     LEFT JOIN mst_tank t ON sa.TankID = t.TankID
-    LEFT JOIN mst_fueltype ft ON t.FuelTypeID = ft.FuelTypeID
+    LEFT JOIN mst_fueltype ft ON (sa.FuelTypeID = ft.FuelTypeID OR t.FuelTypeID = ft.FuelTypeID)
     WHERE sa.IsDeleted = 0
-    ORDER BY sa.AdjustmentDate DESC, sa.StockAdjustmentID DESC
+    ORDER BY sa.AdjustmentDate DESC, sa.AdjustmentID DESC
 ");
 
 $totalStockIn = 0;
 $totalStockOut = 0;
 foreach ($data as $r) {
-    if ($r->AdjustmentType === 'Stock IN') {
+    if (in_array($r->AdjustmentType, ['Stock IN', 'ADD'])) {
         $totalStockIn += floatval($r->Quantity);
     } else {
         $totalStockOut += floatval($r->Quantity);
@@ -82,19 +88,20 @@ foreach ($data as $r) {
         </thead>
         <tbody>
             <?php $sl = 1; foreach ($data as $row): ?>
+            <?php $isStockIn = in_array($row->AdjustmentType, ['Stock IN', 'ADD']); ?>
             <tr>
                 <td><?php echo $sl++; ?></td>
                 <td><?php echo formatDate($row->AdjustmentDate); ?></td>
                 <td><?php echo htmlspecialchars($row->TankName ?? 'N/A'); ?></td>
                 <td><?php echo htmlspecialchars($row->FuelName ?? 'N/A'); ?></td>
                 <td>
-                    <span class="badge bg-<?php echo $row->AdjustmentType === 'Stock IN' ? 'success' : 'danger'; ?>">
-                        <i class="fas fa-<?php echo $row->AdjustmentType === 'Stock IN' ? 'plus-circle' : 'minus-circle'; ?> me-1"></i>
+                    <span class="badge bg-<?php echo $isStockIn ? 'success' : 'danger'; ?>">
+                        <i class="fas fa-<?php echo $isStockIn ? 'plus-circle' : 'minus-circle'; ?> me-1"></i>
                         <?php echo htmlspecialchars($row->AdjustmentType); ?>
                     </span>
                 </td>
                 <td class="fw-bold"><?php echo number_format($row->Quantity, 3); ?></td>
-                <td><?php echo htmlspecialchars($row->Reason ?? '-'); ?></td>
+                <td><?php echo htmlspecialchars($row->Reason !== '' ? $row->Reason : '-'); ?></td>
                 <td><?php echo htmlspecialchars($row->Remarks ?? '-'); ?></td>
                 <td>
                     <button class="btn btn-sm btn-info edit-btn" 

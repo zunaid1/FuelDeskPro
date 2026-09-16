@@ -3,9 +3,14 @@ $pageTitle = 'Tank Readings';
 require_once __DIR__ . '/../../includes/auth_check.php';
 require_once __DIR__ . '/../../includes/header.php';
 require_once __DIR__ . '/../../includes/sidebar.php';
-$tanks = $objQuery->index("SELECT t.TankID, t.TankName, ft.FuelName FROM mst_tank t LEFT JOIN mst_fueltype ft ON t.FuelTypeID=ft.FuelTypeID WHERE t.IsActive=1 AND t.IsDeleted=0");
+$tanks = $objQuery->index("SELECT t.TankID, t.TankName, t.OpeningStockPercent, ft.FuelName FROM mst_tank t LEFT JOIN mst_fueltype ft ON t.FuelTypeID=ft.FuelTypeID WHERE t.IsActive=1 AND t.IsDeleted=0");
 $data = $objQuery->index("SELECT tr.*, t.TankName, ft.FuelName FROM trx_tankreading tr LEFT JOIN mst_tank t ON tr.TankID=t.TankID LEFT JOIN mst_fueltype ft ON t.FuelTypeID=ft.FuelTypeID WHERE tr.IsDeleted=0 ORDER BY tr.ReadingDate DESC, tr.TankReadingID DESC");
 ?>
+<?php if (isStatementClosed(today())): ?>
+<div class="alert alert-danger shadow-sm border-danger text-center fw-bold fs-6 mb-3 py-2">
+    <i class="fas fa-lock me-2"></i> আজকের তারিখের (<?php echo date('d-m-Y'); ?>) হিসাবটি ইতোমধ্যে ক্লোজ করা হয়েছে
+</div>
+<?php endif; ?>
 <div class="table-container">
     <div class="table-header"><h5><i class="fas fa-chart-line text-primary me-2"></i>Tank Readings</h5>
         <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addModal"><i class="fas fa-plus"></i> Add New Reading</button></div>
@@ -34,7 +39,7 @@ $data = $objQuery->index("SELECT tr.*, t.TankName, ft.FuelName FROM trx_tankread
                 <div class="col-md-4 mb-3"><label class="form-label">Date <span class="text-danger">*</span></label><input type="date" name="reading_date" id="reading_date" class="form-control" required value="<?php echo today(); ?>"></div>
                 <div class="col-md-4 mb-3"><label class="form-label">Tank <span class="text-danger">*</span></label>
                     <select name="tank_id" id="tank_id" class="form-select select2" required><option value="">Select Tank</option>
-                    <?php foreach($tanks as $t): ?><option value="<?php echo $t->TankID; ?>"><?php echo htmlspecialchars($t->TankName.' ('.$t->FuelName.')'); ?></option><?php endforeach; ?></select></div>
+                    <?php foreach($tanks as $t): ?><option value="<?php echo $t->TankID; ?>" data-opening="<?php echo $t->OpeningStockPercent; ?>"><?php echo htmlspecialchars($t->TankName.' ('.$t->FuelName.')'); ?></option><?php endforeach; ?></select></div>
                 <div class="col-md-4 mb-3"><label class="form-label">Previous Reading (%)</label><input type="number" step="0.01" name="prev_reading" id="prev_reading" class="form-control" readonly></div>
             </div>
             <div class="row">
@@ -47,23 +52,39 @@ $data = $objQuery->index("SELECT tr.*, t.TankName, ft.FuelName FROM trx_tankread
 </div></div></div>
 <script>
 $(document).ready(function() {
-    // Load previous reading when tank is selected
-    $('#tank_id').on('change', function() {
-        const tankId = $(this).val();
+    function loadPreviousReading() {
+        const tankId = $('#tank_id').val();
+        const readingDate = $('#reading_date').val();
         if (tankId) {
+            const selected = $('#tank_id').find(':selected');
+            const opening = selected.data('opening') !== undefined ? selected.data('opening') : '';
+            $('#prev_reading').val(opening);
             $.ajax({
                 url: '../../modules/entry/tank_reading_entry.php',
                 type: 'POST',
-                data: { action: 'get_previous', tank_id: tankId },
+                data: { action: 'get_previous', tank_id: tankId, reading_date: readingDate },
                 dataType: 'json',
                 success: function(r) {
                     if (r.success) {
                         $('#prev_reading').val(r.prev_percent);
+                        const prev = parseFloat(r.prev_percent) || 0;
+                        const curr = parseFloat($('#current_reading').val()) || 0;
+                        if ($('#current_reading').val() !== '') {
+                            $('#sold_percent').val(Math.max(0, prev - curr).toFixed(2));
+                        }
                     }
                 }
             });
         }
+    }
+
+    // Load previous reading when tank or reading date is changed
+    $('#tank_id, #reading_date').on('change', function() {
+        if (!$('#edit_id').val()) {
+            loadPreviousReading();
+        }
     });
+
     // Calculate sold percent
     $('#current_reading').on('input', function() {
         const prev = parseFloat($('#prev_reading').val()) || 0;
