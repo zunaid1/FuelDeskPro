@@ -358,9 +358,11 @@ foreach ($cashCollections as $cc) {
 // 5. Customer Dues (Credit Sales / বাকী লেনদেন)
 $sqlCredit = "SELECT 
     cd.*,
-    c.CustomerName
+    COALESCE(c.CustomerNameBN, c.CustomerNameEN) AS CustomerName,
+    ft.FuelName
 FROM trx_customerdue cd
-LEFT JOIN mst_customer c ON cd.CustomerID = c.CustomerID
+LEFT JOIN vw_customerlistall c ON cd.CustomerID = c.CustomerId
+LEFT JOIN mst_fueltype ft ON cd.FuelTypeID = ft.FuelTypeID
 WHERE cd.TxnDate = ? AND cd.IsActive = 1 AND cd.IsDeleted = 0
 ORDER BY cd.CustomerDueID ASC";
 $creditSales = $objQuery->index($sqlCredit, [$targetDate]);
@@ -696,51 +698,81 @@ $fuelPurchases = $objQuery->index($sqlFuelPurchase, [$targetDate]);
 
 /* Remarks Section Extra Large Font */
 #statement-print-area.mobile-view-mode .remarks-footer-section {
-    font-size: 24px !important;
-    line-height: 1.75 !important;
-    margin-top: 15px !important;
-}
-
-#statement-print-area.mobile-view-mode .remarks-footer-section div {
-    font-size: 24px !important;
-    line-height: 1.75 !important;
-}
-
-#statement-print-area.mobile-view-mode .remarks-footer-section strong {
-    font-size: 26px !important;
-    font-weight: 900 !important;
-}
-
-#statement-print-area.mobile-view-mode .remarks-footer-section .remarks-title {
     font-size: 28px !important;
+    line-height: 1.6 !important;
+    margin-top: 18px !important;
+    color: #000000 !important;
+}
+
+#statement-print-area.mobile-view-mode .remarks-footer-section div,
+#statement-print-area.mobile-view-mode .remarks-footer-section p,
+#statement-print-area.mobile-view-mode .remarks-footer-section span {
+    font-size: 28px !important;
+    line-height: 1.6 !important;
+    color: #000000 !important;
+}
+
+#statement-print-area.mobile-view-mode .remarks-footer-section strong,
+#statement-print-area.mobile-view-mode .remarks-footer-section b,
+#statement-print-area.mobile-view-mode .remarks-footer-section span.fw-bold {
+    font-size: 30px !important;
     font-weight: 900 !important;
-    margin-bottom: 8px !important;
+    color: #000000 !important;
+}
+
+#statement-print-area.mobile-view-mode .remarks-footer-section .remarks-title,
+#statement-print-area.mobile-view-mode .remarks-footer-section .remarks-title strong {
+    font-size: 32px !important;
+    font-weight: 900 !important;
+    margin-bottom: 10px !important;
+    color: #000000 !important;
 }
 
 #statement-print-area.mobile-view-mode .remarks-footer-section .mb-1 {
-    font-size: 24px !important;
-    margin-bottom: 10px !important;
-    line-height: 1.75 !important;
+    font-size: 28px !important;
+    margin-bottom: 12px !important;
+    line-height: 1.6 !important;
 }
 
 #statement-print-area.mobile-view-mode .remarks-footer-section i {
-    font-size: 22px !important;
-    margin-right: 6px !important;
+    font-size: 26px !important;
+    margin-right: 8px !important;
 }
 
-/* --- Keep Nozzle Reading Section Original Format in Mobile View --- */
+/* --- Nozzle Reading Section Font Size & Styling in Mobile View --- */
 #statement-print-area.mobile-view-mode .nozzle-reading-table th:not([colspan="9"]),
 #statement-print-area.mobile-view-mode .nozzle-reading-table td {
-    font-size: 14.5px !important;
-    padding: 4px 6px !important;
-    line-height: 1.4 !important;
-    border: 1px solid #000000 !important;
+    font-size: 22px !important;
+    padding: 8px 8px !important;
+    line-height: 1.5 !important;
+    border: 1.5px solid #000000 !important;
+    color: #000000 !important;
+}
+
+/* Hide Master Meter Reading section in Mobile View Mode */
+#statement-print-area.mobile-view-mode .col-master-meter {
+    display: none !important;
+}
+
+#statement-print-area.mobile-view-mode .desktop-tfoot {
+    display: none !important;
+}
+
+#statement-print-area.mobile-view-mode .mobile-tfoot {
+    display: table-footer-group !important;
 }
 
 #statement-print-area.mobile-view-mode .nozzle-reading-table th:not([colspan="9"]) {
-    font-size: 14.5px !important;
-    font-weight: bold !important;
-    background-color: #f0f0f0 !important;
+    font-size: 22px !important;
+    font-weight: 900 !important;
+    background-color: #dbe4ee !important;
+    color: #000000 !important;
+}
+
+#statement-print-area.mobile-view-mode .nozzle-reading-table td.font-weight-bold,
+#statement-print-area.mobile-view-mode .nozzle-reading-table td:first-child {
+    font-size: 23px !important;
+    font-weight: 900 !important;
 }
 
 #statement-print-area.mobile-view-mode .nozzle-reading-table th[colspan="9"],
@@ -758,9 +790,10 @@ $fuelPurchases = $objQuery->index($sqlFuelPurchase, [$targetDate]);
 }
 
 #statement-print-area.mobile-view-mode .nozzle-reading-table tfoot tr td {
-    font-size: 14.5px !important;
-    font-weight: bold !important;
-    background-color: #f0f0f0 !important;
+    font-size: 24px !important;
+    font-weight: 900 !important;
+    background-color: #e2e8f0 !important;
+    padding: 10px 8px !important;
 }
 
 /* --- Ultra-Large Font Size (32px - 36px) for Amount Numbers in Mobile View --- */
@@ -802,6 +835,32 @@ $fuelPurchases = $objQuery->index($sqlFuelPurchase, [$targetDate]);
     font-weight: 900 !important;
 }
 
+/* Expenses, Cash Collections & Transaction Summary Table Description Font Size Enhancement for Mobile View */
+#statement-print-area.mobile-view-mode .expenses-table tbody td,
+#statement-print-area.mobile-view-mode .cash-collections-table tbody td,
+#statement-print-area.mobile-view-mode .summary-table tbody td,
+#statement-print-area.mobile-view-mode .summary-table tfoot td:first-child {
+    font-size: 28px !important;
+    font-weight: 800 !important;
+    line-height: 1.5 !important;
+}
+
+#statement-print-area.mobile-view-mode .expenses-table tbody td strong.text-secondary,
+#statement-print-area.mobile-view-mode .expenses-table tbody td strong,
+#statement-print-area.mobile-view-mode .cash-collections-table tbody td strong,
+#statement-print-area.mobile-view-mode .cash-collections-table tbody td b,
+#statement-print-area.mobile-view-mode .summary-table tbody td i,
+#statement-print-area.mobile-view-mode .summary-table tfoot td i {
+    font-size: 26px !important;
+    font-weight: 900 !important;
+}
+
+#statement-print-area.mobile-view-mode .expenses-table tbody td.text-center,
+#statement-print-area.mobile-view-mode .cash-collections-table tbody td.text-center {
+    font-size: 26px !important;
+    font-weight: 800 !important;
+}
+
 #statement-print-area.mobile-view-mode .expenses-table tfoot td,
 #statement-print-area.mobile-view-mode .cash-collections-table tfoot td,
 #statement-print-area.mobile-view-mode .summary-table tfoot td {
@@ -822,10 +881,18 @@ $fuelPurchases = $objQuery->index($sqlFuelPurchase, [$targetDate]);
         font-size: 20px !important;
         padding: 8px 10px !important;
     }
+    #statement-print-area.mobile-view-mode .expenses-table tbody td,
+    #statement-print-area.mobile-view-mode .expenses-table tbody td strong,
+    #statement-print-area.mobile-view-mode .cash-collections-table tbody td,
+    #statement-print-area.mobile-view-mode .cash-collections-table tbody td strong,
+    #statement-print-area.mobile-view-mode .summary-table tbody td,
+    #statement-print-area.mobile-view-mode .summary-table tfoot td:first-child {
+        font-size: 24px !important;
+    }
     #statement-print-area.mobile-view-mode .nozzle-reading-table th,
     #statement-print-area.mobile-view-mode .nozzle-reading-table td {
-        font-size: 14px !important;
-        padding: 4px 6px !important;
+        font-size: 18px !important;
+        padding: 6px 6px !important;
     }
     #statement-print-area.mobile-view-mode h2 {
         font-size: 28px !important;
@@ -985,15 +1052,15 @@ $fuelPurchases = $objQuery->index($sqlFuelPurchase, [$targetDate]);
                 </tr>
                 <tr>
                     <th rowspan="2" style="width: 10%; vertical-align: middle; text-align: center;"><?php echo $thNozzle; ?></th>
-                    <th colspan="3" style="text-align: center;"><?php echo $lblMasterMeter; ?></th>
+                    <th colspan="3" class="col-master-meter" style="text-align: center;"><?php echo $lblMasterMeter; ?></th>
                     <th colspan="3" style="text-align: center;"><?php echo $lblGeneralMeter; ?></th>
                     <th rowspan="2" style="width: 8%; vertical-align: middle; text-align: center;"><?php echo $thRate; ?></th>
                     <th rowspan="2" style="width: 12%; vertical-align: middle; text-align: center;"><?php echo $thAmount; ?></th>
                 </tr>
                 <tr>
-                    <th style="width: 12%; text-align: center;"><?php echo $thCurrReadingM; ?></th>
-                    <th style="width: 12%; text-align: center;"><?php echo $thPrevReadingM; ?></th>
-                    <th style="width: 11%; text-align: center;"><?php echo $thSoldQty; ?></th>
+                    <th class="col-master-meter" style="width: 12%; text-align: center;"><?php echo $thCurrReadingM; ?></th>
+                    <th class="col-master-meter" style="width: 12%; text-align: center;"><?php echo $thPrevReadingM; ?></th>
+                    <th class="col-master-meter" style="width: 11%; text-align: center;"><?php echo $thSoldQty; ?></th>
                     <th style="width: 12%; text-align: center;"><?php echo $thCurrReadingG; ?></th>
                     <th style="width: 12%; text-align: center;"><?php echo $thPrevReadingG; ?></th>
                     <th style="width: 11%; text-align: center;"><?php echo $thSoldQty; ?></th>
@@ -1023,9 +1090,9 @@ $fuelPurchases = $objQuery->index($sqlFuelPurchase, [$targetDate]);
                 ?>
                 <tr>
                     <td class="text-center font-weight-bold"><?php echo htmlspecialchars($nozzleName); ?></td>
-                    <td class="text-right"><?php echo number_format($mCurr, 2); ?></td>
-                    <td class="text-right"><?php echo number_format($mPrev, 2); ?></td>
-                    <td class="text-right font-weight-bold"><?php echo number_format($mDiff, 2); ?></td>
+                    <td class="text-right col-master-meter"><?php echo number_format($mCurr, 2); ?></td>
+                    <td class="text-right col-master-meter"><?php echo number_format($mPrev, 2); ?></td>
+                    <td class="text-right font-weight-bold col-master-meter"><?php echo number_format($mDiff, 2); ?></td>
                     <td class="text-right"><?php echo number_format($gCurr, 2); ?></td>
                     <td class="text-right"><?php echo number_format($gPrev, 2); ?></td>
                     <td class="text-right font-weight-bold"><?php echo number_format($gDiff, 2); ?></td>
@@ -1038,11 +1105,20 @@ $fuelPurchases = $objQuery->index($sqlFuelPurchase, [$targetDate]);
                 </tr>
                 <?php endif; ?>
             </tbody>
-            <tfoot>
+            <tfoot class="desktop-tfoot">
                 <tr style="background-color: #f0f0f0; font-weight: bold;">
                     <td colspan="3" class="text-right" style="padding-right: 12px;"><?php echo $lblTotalNozzle; ?></td>
                     <td class="text-right"><?php echo number_format($totalMasterLiters, 2); ?></td>
                     <td colspan="2" class="text-right"></td>
+                    <td class="text-right"><?php echo number_format($totalGeneralLiters, 2); ?></td>
+                    <td class="text-right"><?php echo number_format($unitSellingRate, 2); ?></td>
+                    <td class="text-right"><?php echo number_format($totalSalesAmount, 2); ?></td>
+                </tr>
+            </tfoot>
+            <tfoot class="mobile-tfoot" style="display: none;">
+                <tr style="background-color: #f0f0f0; font-weight: bold;">
+                    <td></td>
+                    <td colspan="2" class="text-right" style="padding-right: 12px;"><?php echo $lblTotalNozzle; ?></td>
                     <td class="text-right"><?php echo number_format($totalGeneralLiters, 2); ?></td>
                     <td class="text-right"><?php echo number_format($unitSellingRate, 2); ?></td>
                     <td class="text-right"><?php echo number_format($totalSalesAmount, 2); ?></td>
@@ -1231,11 +1307,17 @@ $fuelPurchases = $objQuery->index($sqlFuelPurchase, [$targetDate]);
                 <?php 
                 $slDue = 1;
                 foreach ($creditSales as $cs):
-                    $cDueName = $cs->CustomerName ?? (($lang === 'en') ? 'Customer Due' : 'গ্রাহক বাকী');
+                    $cDueName = !empty($cs->CustomerName) ? $cs->CustomerName : (($lang === 'en') ? 'Customer Due' : 'গ্রাহক বাকী');
+                    $fuelStr = !empty($cs->FuelName) ? ' — ' . htmlspecialchars($cs->FuelName) : '';
+                    $vehStr = !empty($cs->VehicleNumber) ? ' (' . ($lang === 'en' ? 'Veh: ' : 'গাড়ী: ') . htmlspecialchars($cs->VehicleNumber) . ')' : '';
+                    $qtyStr = ($cs->Quantity > 0) ? ' [' . number_format($cs->Quantity, 3) . ' L' . ($cs->Rate > 0 ? ' @ ' . number_format($cs->Rate, 2) : '') . ']' : '';
+                    $remStr = !empty($cs->Remarks) ? ' — <em>' . htmlspecialchars($cs->Remarks) . '</em>' : '';
                 ?>
                 <tr>
                     <td class="text-center"><?php echo $slDue++; ?></td>
-                    <td><?php echo htmlspecialchars($cDueName); ?></td>
+                    <td>
+                        <strong><?php echo htmlspecialchars($cDueName); ?></strong><?php echo $fuelStr . $vehStr . $qtyStr . $remStr; ?>
+                    </td>
                     <td class="text-right font-weight-bold"><?php echo number_format($cs->DueAmount > 0 ? $cs->DueAmount : $cs->TotalAmount, 2); ?></td>
                 </tr>
                 <?php endforeach; ?>

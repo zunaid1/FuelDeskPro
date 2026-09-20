@@ -3,9 +3,61 @@ $pageTitle = 'Due Collections';
 require_once __DIR__ . '/../../includes/auth_check.php';
 require_once __DIR__ . '/../../includes/header.php';
 require_once __DIR__ . '/../../includes/sidebar.php';
-$customers = $objQuery->index("SELECT CustomerID, CustomerName, Mobile FROM mst_customer WHERE IsActive=1 AND IsDeleted=0");
+
+ensureCustomerCollectionTableSchema();
+
+// Fetch Active Customers, Employees, and Shareholders via UNION
+$customers = $objQuery->index("
+    SELECT 
+        CONCAT('C_', CustomerID) AS ValueID,
+        CustomerID AS RealID,
+        'Customer' AS EntityType,
+        CustomerName AS Name,
+        Mobile
+    FROM mst_customer 
+    WHERE IsActive = 1 AND IsDeleted = 0
+
+    UNION ALL
+
+    SELECT 
+        CONCAT('E_', Id) AS ValueID,
+        Id AS RealID,
+        'Employee' AS EntityType,
+        COALESCE(NULLIF(NameBN, ''), NameEN) AS Name,
+        Mobile
+    FROM mst_employee 
+    WHERE IsActive = 1 AND IsDeleted = 0
+
+    UNION ALL
+
+    SELECT 
+        CONCAT('S_', Id) AS ValueID,
+        Id AS RealID,
+        'Shareholder' AS EntityType,
+        COALESCE(NULLIF(NameBN, ''), NameEN) AS Name,
+        Mobile
+    FROM mst_shareholder 
+    WHERE IsActive = 1 AND IsDeleted = 0
+
+    ORDER BY Name ASC
+");
+
 $methods = $objQuery->index("SELECT PaymentMethodID, MethodName FROM cfg_paymentmethod WHERE IsActive=1 AND IsDeleted=0");
-$data = $objQuery->index("SELECT cc.*, c.CustomerName, pm.MethodName FROM trx_customercollection cc LEFT JOIN mst_customer c ON cc.CustomerID=c.CustomerID LEFT JOIN cfg_paymentmethod pm ON cc.PaymentMethodID=pm.PaymentMethodID WHERE cc.IsDeleted=0 ORDER BY cc.TxnDate DESC, cc.CustomerCollectionID DESC");
+
+$data = $objQuery->index("
+    SELECT 
+        cc.*, 
+        CASE 
+            WHEN cc.CustomerType = 'Employee' THEN (SELECT COALESCE(NULLIF(NameBN, ''), NameEN) FROM mst_employee WHERE Id = cc.CustomerID)
+            WHEN cc.CustomerType = 'Shareholder' THEN (SELECT COALESCE(NULLIF(NameBN, ''), NameEN) FROM mst_shareholder WHERE Id = cc.CustomerID)
+            ELSE (SELECT CustomerName FROM mst_customer WHERE CustomerID = cc.CustomerID)
+        END AS PersonName,
+        pm.MethodName 
+    FROM trx_customercollection cc 
+    LEFT JOIN cfg_paymentmethod pm ON cc.PaymentMethodID = pm.PaymentMethodID 
+    WHERE cc.IsDeleted = 0 
+    ORDER BY cc.TxnDate DESC, cc.CustomerCollectionID DESC
+");
 ?>
 <?php if (isStatementClosed(today())): ?>
 <div class="alert alert-danger shadow-sm border-danger text-center fw-bold fs-6 mb-3 py-2">
@@ -16,15 +68,23 @@ $data = $objQuery->index("SELECT cc.*, c.CustomerName, pm.MethodName FROM trx_cu
     <div class="table-header"><h5><i class="fas fa-hand-holding-usd text-primary me-2"></i>Due Collections</h5>
         <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addModal"><i class="fas fa-plus"></i> Add New Collection</button></div>
     <table class="table table-hover datatable">
-        <thead><tr><th>SL</th><th>Date</th><th>Customer</th><th>Amount</th><th>Payment Method</th><th>Reference</th><th>Actions</th></tr></thead>
+        <thead><tr><th>SL</th><th>Date</th><th>Customer / Person</th><th>Amount</th><th>Payment Method</th><th>Reference</th><th>Actions</th></tr></thead>
         <tbody><?php $sl=1; foreach($data as $row): ?><tr>
             <td><?php echo $sl++; ?></td><td><?php echo formatDate($row->TxnDate); ?></td>
-            <td><?php echo htmlspecialchars($row->CustomerName ?? 'N/A'); ?></td>
+            <td>
+                <?php echo htmlspecialchars($row->PersonName ?? 'N/A'); ?>
+                <?php if (!empty($row->CustomerType) && $row->CustomerType !== 'Customer'): ?>
+                    <span class="badge bg-secondary ms-1"><?php echo htmlspecialchars($row->CustomerType); ?></span>
+                <?php endif; ?>
+            </td>
             <td><?php echo $currencySymbol.' '.number_format($row->Amount, 2); ?></td>
             <td><?php echo htmlspecialchars($row->MethodName ?? $row->PaymentMethodID); ?></td>
             <td><?php echo htmlspecialchars($row->ReferenceNo ?? ''); ?></td>
             <td>
-                <button class="btn btn-sm btn-info edit-btn" data-id="<?php echo $row->CustomerCollectionID; ?>" data-date="<?php echo $row->TxnDate; ?>" data-customer="<?php echo $row->CustomerID; ?>" data-amount="<?php echo $row->Amount; ?>" data-method="<?php echo $row->PaymentMethodID; ?>" data-ref="<?php echo htmlspecialchars($row->ReferenceNo ?? ''); ?>" data-remarks="<?php echo htmlspecialchars($row->Remarks ?? ''); ?>"><i class="fas fa-edit"></i></button>
+                <?php 
+                    $valueID = ($row->CustomerType === 'Employee') ? ('E_' . $row->CustomerID) : (($row->CustomerType === 'Shareholder') ? ('S_' . $row->CustomerID) : ('C_' . $row->CustomerID));
+                ?>
+                <button class="btn btn-sm btn-info edit-btn" data-id="<?php echo $row->CustomerCollectionID; ?>" data-date="<?php echo $row->TxnDate; ?>" data-customer="<?php echo $valueID; ?>" data-amount="<?php echo $row->Amount; ?>" data-method="<?php echo $row->PaymentMethodID; ?>" data-ref="<?php echo htmlspecialchars($row->ReferenceNo ?? ''); ?>" data-remarks="<?php echo htmlspecialchars($row->Remarks ?? ''); ?>"><i class="fas fa-edit"></i></button>
                 <button class="btn btn-sm btn-danger delete-btn" data-id="<?php echo $row->CustomerCollectionID; ?>"><i class="fas fa-trash"></i></button>
             </td>
         </tr><?php endforeach; ?></tbody>
@@ -37,9 +97,15 @@ $data = $objQuery->index("SELECT cc.*, c.CustomerName, pm.MethodName FROM trx_cu
         <div class="modal-body">
             <div class="row">
                 <div class="col-md-6 mb-3"><label class="form-label">Date <span class="text-danger">*</span></label><input type="date" name="txn_date" id="txn_date" class="form-control" required value="<?php echo today(); ?>"></div>
-                <div class="col-md-6 mb-3"><label class="form-label">Customer <span class="text-danger">*</span></label>
-                    <select name="customer_id" id="customer_id" class="form-select select2" required><option value="">Select Customer</option>
-                    <?php foreach($customers as $c): ?><option value="<?php echo $c->CustomerID; ?>"><?php echo htmlspecialchars($c->CustomerName.' ('.$c->Mobile.')'); ?></option><?php endforeach; ?></select></div>
+                <div class="col-md-6 mb-3"><label class="form-label">Person / Customer <span class="text-danger">*</span></label>
+                    <select name="customer_id" id="customer_id" class="form-select select2" required><option value="">-- কাস্টমার / শেয়ারহোল্ডার / কর্মচারী নির্বাচন করুন --</option>
+                    <?php foreach($customers as $c): ?>
+                        <?php 
+                            $typeBadge = ($c->EntityType === 'Customer') ? 'গ্রাহক' : (($c->EntityType === 'Employee') ? 'কর্মচারী' : 'শেয়ারহোল্ডার');
+                            $label = htmlspecialchars($c->Name) . ' (' . $typeBadge . (!empty($c->Mobile) ? ' - ' . htmlspecialchars($c->Mobile) : '') . ')';
+                        ?>
+                        <option value="<?php echo $c->ValueID; ?>"><?php echo $label; ?></option>
+                    <?php endforeach; ?></select></div>
             </div>
             <div class="row">
                 <div class="col-md-4 mb-3"><label class="form-label">Amount <span class="text-danger">*</span></label><input type="number" step="0.01" name="amount" id="amount" class="form-control" required></div>
@@ -55,7 +121,7 @@ $data = $objQuery->index("SELECT cc.*, c.CustomerName, pm.MethodName FROM trx_cu
 </div></div></div>
 <script>
 $(document).ready(function() {
-    $('#addModal').on('show.bs.modal', function(e) { if(!$(e.relatedTarget).hasClass('edit-btn')){ $('#dataForm')[0].reset();$('#edit_id').val('');$('#txn_date').val('<?php echo today(); ?>');$('#modalTitle').html('<i class="fas fa-plus-circle me-2"></i>Add New Collection'); } });
+    $('#addModal').on('show.bs.modal', function(e) { if(!$(e.relatedTarget).hasClass('edit-btn')){ $('#dataForm')[0].reset();$('#edit_id').val('');$('#txn_date').val('<?php echo today(); ?>');$('#customer_id').val('').trigger('change');$('#payment_method').val('').trigger('change');$('#modalTitle').html('<i class="fas fa-plus-circle me-2"></i>Add New Collection'); } });
     $(document).on('click', '.edit-btn', function() { const b=$(this);$('#edit_id').val(b.data('id'));$('#txn_date').val(b.data('date'));$('#customer_id').val(b.data('customer')).trigger('change');$('#amount').val(b.data('amount'));$('#payment_method').val(b.data('method')).trigger('change');$('#reference_no').val(b.data('ref'));$('#remarks').val(b.data('remarks'));$('#modalTitle').html('<i class="fas fa-edit me-2"></i>Edit Collection');$('#addModal').modal('show'); });
     $('#dataForm').on('submit', function(e) { e.preventDefault();const f=$(this),btn=f.find('[type="submit"]'),orig=btn.html();btn.prop('disabled',true).html('<i class="fas fa-spinner fa-spin"></i> Processing...');$.ajax({url:f.attr('action'),type:'POST',data:f.serialize(),dataType:'json',success:function(r){if(r.success){showNotification(r.message,'success');$('#addModal').modal('hide');setTimeout(()=>location.reload(),500);}else showNotification(r.message,'error');},error:function(){showNotification('Error!','error');},complete:function(){btn.prop('disabled',false).html(orig);}});});
     $(document).on('click', '.delete-btn', function() { if(!confirmDelete()) return;const b=$(this),id=b.data('id');b.prop('disabled',true).html('<i class="fas fa-spinner fa-spin"></i>');$.ajax({url:'../../modules/entry/due_collection_entry.php',type:'POST',data:{action:'delete',record_id:id},dataType:'json',success:function(r){if(r.success){showNotification(r.message,'success');setTimeout(()=>location.reload(),500);}else showNotification(r.message,'error');},complete:function(){b.prop('disabled',false).html('<i class="fas fa-trash"></i>');}});});

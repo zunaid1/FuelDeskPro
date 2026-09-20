@@ -938,6 +938,57 @@ CREATE TABLE `trx_customerdue` (
 -- --------------------------------------------------------
 
 --
+-- Table structure for table `trx_customerdue_Previous`
+--
+
+CREATE TABLE `trx_customerdue_Previous` (
+  `CustomerDuePreviousID` int(11) NOT NULL AUTO_INCREMENT,
+  `TxnDate` date NOT NULL,
+  `CustomerID` int(11) NOT NULL COMMENT 'Logical FK -> mst_Customer.CustomerID',
+  `TotalAmount` decimal(14,2) NOT NULL DEFAULT 0.00,
+  `PaidAmount` decimal(14,2) NOT NULL DEFAULT 0.00,
+  `DueAmount` decimal(14,2) NOT NULL DEFAULT 0.00,
+  `Remarks` varchar(255) DEFAULT NULL,
+  `CreatedBy` int(11) DEFAULT NULL,
+  `CreatedAt` datetime NOT NULL DEFAULT current_timestamp(),
+  `UpdatedBy` int(11) DEFAULT NULL,
+  `UpdatedAt` datetime NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  `IsActive` tinyint(1) NOT NULL DEFAULT 1,
+  `IsDeleted` tinyint(1) NOT NULL DEFAULT 0,
+  PRIMARY KEY (`CustomerDuePreviousID`),
+  KEY `idx_prev_date` (`TxnDate`),
+  KEY `idx_prev_customer` (`CustomerID`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Historical customer due records prior to software launch cutoff';
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `trx_Customer_Due_Opening`
+--
+
+CREATE TABLE `trx_Customer_Due_Opening` (
+  `OpeningDueID` int(11) NOT NULL AUTO_INCREMENT,
+  `TxnDate` date NOT NULL,
+  `CustomerID` int(11) NOT NULL COMMENT 'Logical FK -> mst_Customer / mst_Employee / mst_Shareholder',
+  `CustomerType` varchar(30) NOT NULL DEFAULT 'Customer',
+  `SalesAmount` decimal(14,2) NOT NULL DEFAULT 0.00,
+  `Payment` decimal(14,2) NOT NULL DEFAULT 0.00,
+  `Balance` decimal(14,2) NOT NULL DEFAULT 0.00,
+  `Remarks` varchar(255) DEFAULT NULL,
+  `CreatedBy` int(11) DEFAULT NULL,
+  `CreatedAt` datetime NOT NULL DEFAULT current_timestamp(),
+  `UpdatedBy` int(11) DEFAULT NULL,
+  `UpdatedAt` datetime NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  `IsActive` tinyint(1) NOT NULL DEFAULT 1,
+  `IsDeleted` tinyint(1) NOT NULL DEFAULT 0,
+  PRIMARY KEY (`OpeningDueID`),
+  KEY `idx_open_date` (`TxnDate`),
+  KEY `idx_open_customer` (`CustomerID`, `CustomerType`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Historical customer due and payment records prior to software launch';
+
+-- --------------------------------------------------------
+
+--
 -- Table structure for table `trx_expense`
 --
 

@@ -11,20 +11,24 @@ switch ($action) {
 }
 function handleSave() {
     global $objQuery;
+    ensureCustomerCollectionTableSchema();
     $id = intval($_POST['record_id'] ?? 0);
     $date = $_POST['txn_date'] ?? '';
-    $customer = intval($_POST['customer_id'] ?? 0);
+    $rawCustomer = $_POST['customer_id'] ?? '';
+    $entity = parseSelectedEntity($rawCustomer);
+    $customerID = $entity['id'];
+    $customerType = $entity['type'];
     $amount = floatval($_POST['amount'] ?? 0);
     $method = intval($_POST['payment_method'] ?? 0);
     $ref = sanitize($_POST['reference_no'] ?? '');
     $remarks = sanitize($_POST['remarks'] ?? '');
-    if (empty($date) || !$customer || $amount <= 0 || !$method) jsonResponse(false, 'Required fields missing!');
+    if (empty($date) || !$customerID || $amount <= 0 || !$method) jsonResponse(false, 'Required fields missing!');
     if (isStatementClosed($date)) jsonResponse(false, 'এই তারিখের ('.date('d-m-Y', strtotime($date)).') হিসাবটি ইতোমধ্যে ফাইনাল সাবমিট (ক্লোজ) করা হয়েছে! নতুন ডাটা সেভ বা আপডেট করা সম্ভব নয়।');
     if ($id > 0) {
-        $objQuery->inUpDel("UPDATE trx_customercollection SET TxnDate=?, CustomerID=?, Amount=?, PaymentMethodID=?, ReferenceNo=?, Remarks=?, UpdatedBy=?, UpdatedAt=NOW() WHERE CustomerCollectionID=? AND IsDeleted=0", [$date, $customer, $amount, $method, $ref, $remarks, getUserId(), $id]);
+        $objQuery->inUpDel("UPDATE trx_customercollection SET TxnDate=?, CustomerID=?, CustomerType=?, Amount=?, PaymentMethodID=?, ReferenceNo=?, Remarks=?, UpdatedBy=?, UpdatedAt=NOW() WHERE CustomerCollectionID=? AND IsDeleted=0", [$date, $customerID, $customerType, $amount, $method, $ref, $remarks, getUserId(), $id]);
         jsonResponse(true, 'Collection updated successfully!');
     } else {
-        $objQuery->inUpDel("INSERT INTO trx_customercollection (TxnDate, CustomerID, Amount, PaymentMethodID, ReferenceNo, Remarks, CreatedBy) VALUES (?,?,?,?,?,?,?)", [$date, $customer, $amount, $method, $ref, $remarks, getUserId()]);
+        $objQuery->inUpDel("INSERT INTO trx_customercollection (TxnDate, CustomerID, CustomerType, Amount, PaymentMethodID, ReferenceNo, Remarks, CreatedBy) VALUES (?,?,?,?,?,?,?,?)", [$date, $customerID, $customerType, $amount, $method, $ref, $remarks, getUserId()]);
         jsonResponse(true, 'Collection added successfully!');
     }
 }

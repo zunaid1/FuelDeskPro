@@ -47,6 +47,32 @@ $langLabel = currentLang() === 'bn' ? 'English' : 'বাংলা';
             </div>
         </li>
 
+        <!-- Previous Data Entry Dropdown -->
+        <?php 
+        $historicalPages = ['previous_customer_due.php', 'add_bulk_collection.php'];
+        $isHistoricalPage = in_array($currentPage, $historicalPages); 
+        ?>
+        <li class="nav-item">
+            <a class="nav-link <?php echo $isHistoricalPage ? '' : 'collapsed'; ?>" data-bs-toggle="collapse" href="#previousDataMenu" role="button" aria-expanded="<?php echo $isHistoricalPage ? 'true' : 'false'; ?>">
+                <i class="fas fa-folder-plus"></i> <span><?php echo t('Previous Data Entry'); ?></span>
+                <i class="fas fa-chevron-down ms-auto"></i>
+            </a>
+            <div class="collapse <?php echo $isHistoricalPage ? 'show' : ''; ?>" id="previousDataMenu">
+                <ul class="nav flex-column ms-3">
+                    <li class="nav-item">
+                        <a class="nav-link small <?php echo $currentPage == 'previous_customer_due.php' ? 'active' : ''; ?>" href="<?php echo BASE_URL; ?>modules/historical_data/previous_customer_due.php">
+                            <i class="fas fa-user-clock"></i> <?php echo t('Previous Customer Dues'); ?>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link small <?php echo $currentPage == 'add_bulk_collection.php' ? 'active' : ''; ?>" href="<?php echo BASE_URL; ?>modules/historical_data/add_bulk_collection.php">
+                            <i class="fas fa-file-csv"></i> <?php echo t('Add Bulk Collection'); ?>
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </li>
+
         <!-- Master Data Dropdown -->
         <li class="nav-item">
           <a class="nav-link collapsed" data-bs-toggle="collapse" href="#masterDataMenu" role="button" aria-expanded="false">
@@ -75,7 +101,7 @@ $langLabel = currentLang() === 'bn' ? 'English' : 'বাংলা';
         </li>
 
         <!-- Reports Dropdown -->
-        <?php $isReportPage = in_array($currentPage, ['daily_statement.php', 'profit_loss.php', 'date_to_date_statement.php', 'monthly_collection_expense_summary.php', 'monthly_expense_item_wise.php', 'stock_summary.php']); ?>
+        <?php $isReportPage = in_array($currentPage, ['daily_statement.php', 'profit_loss.php', 'date_to_date_statement.php', 'monthly_collection_expense_summary.php', 'monthly_expense_item_wise.php', 'stock_summary.php', 'customer_due.php']); ?>
         <li class="nav-item">
             <a class="nav-link <?php echo $isReportPage ? '' : 'collapsed'; ?>" data-bs-toggle="collapse" href="#reportsMenu" role="button" aria-expanded="<?php echo $isReportPage ? 'true' : 'false'; ?>">
                 <i class="fas fa-chart-bar"></i> <span><?php echo t('Reports'); ?></span>
@@ -89,6 +115,7 @@ $langLabel = currentLang() === 'bn' ? 'English' : 'বাংলা';
                     <li class="nav-item"><a class="nav-link small <?php echo $currentPage == 'monthly_collection_expense_summary.php' ? 'active' : ''; ?>" href="<?php echo BASE_URL; ?>modules/reports/monthly_collection_expense_summary.php"><i class="fas fa-chart-line"></i> <?php echo t('Monthly Collection & Expense Summary'); ?></a></li>
                     <li class="nav-item"><a class="nav-link small <?php echo $currentPage == 'monthly_expense_item_wise.php' ? 'active' : ''; ?>" href="<?php echo BASE_URL; ?>modules/reports/monthly_expense_item_wise.php"><i class="fas fa-receipt"></i> <?php echo t('Monthly Expense Summary Item Wise'); ?></a></li>
                     <li class="nav-item"><a class="nav-link small <?php echo $currentPage == 'stock_summary.php' ? 'active' : ''; ?>" href="<?php echo BASE_URL; ?>modules/reports/stock_summary.php"><i class="fas fa-boxes"></i> <?php echo t('Stock Summary'); ?></a></li>
+                    <li class="nav-item"><a class="nav-link small <?php echo $currentPage == 'customer_due.php' ? 'active' : ''; ?>" href="<?php echo BASE_URL; ?>modules/reports/customer_due.php"><i class="fas fa-user-tag"></i> <?php echo t('Customer Due'); ?></a></li>
                 </ul>
             </div>
         </li>

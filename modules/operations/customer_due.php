@@ -4,8 +4,8 @@ require_once __DIR__ . '/../../includes/auth_check.php';
 require_once __DIR__ . '/../../includes/header.php';
 require_once __DIR__ . '/../../includes/sidebar.php';
 $customers = $objQuery->index("SELECT * FROM vw_customerlistall");
-$fuels = $objQuery->index("SELECT FuelTypeID, FuelName FROM mst_fueltype WHERE IsActive=1 AND IsDeleted=0");
-$data = $objQuery->index("SELECT cd.*, c.CustomerName, c.Mobile, ft.FuelName FROM trx_customerdue cd LEFT JOIN mst_customer c ON cd.CustomerID=c.CustomerID LEFT JOIN mst_fueltype ft ON cd.FuelTypeID=ft.FuelTypeID WHERE cd.IsDeleted=0 ORDER BY cd.TxnDate DESC, cd.CustomerDueID DESC");
+$fuels = $objQuery->index("SELECT FuelTypeID, FuelName, SellingRate FROM mst_fueltype WHERE IsActive=1 AND IsDeleted=0");
+$data = $objQuery->index("SELECT cd.*, COALESCE(c.CustomerNameBN, c.CustomerNameEN) AS CustomerName, c.Mobile, ft.FuelName FROM trx_customerdue cd LEFT JOIN vw_customerlistall c ON cd.CustomerID=c.CustomerId LEFT JOIN mst_fueltype ft ON cd.FuelTypeID=ft.FuelTypeID WHERE cd.IsDeleted=0 ORDER BY cd.TxnDate DESC, cd.CustomerDueID DESC");
 ?>
 <?php if (isStatementClosed(today())): ?>
 <div class="alert alert-danger shadow-sm border-danger text-center fw-bold fs-6 mb-3 py-2">
@@ -41,18 +41,18 @@ $data = $objQuery->index("SELECT cd.*, c.CustomerName, c.Mobile, ft.FuelName FRO
                 <div class="col-md-4 mb-3"><label class="form-label">Date <span class="text-danger">*</span></label><input type="date" name="txn_date" id="txn_date" class="form-control" required value="<?php echo today(); ?>"></div>
                 <div class="col-md-4 mb-3"><label class="form-label">Customer <span class="text-danger">*</span></label>
                     <select name="customer_id" id="customer_id" class="form-select select2" required><option value="">Select Customer</option>
-                    <?php foreach($customers as $c): ?><option value="<?php echo $c->CustomerID; ?>"><?php echo htmlspecialchars($c->CustomerNameBN.' ('.$c->Mobile.')'); ?></option><?php endforeach; ?></select></div>
+                    <?php foreach($customers as $c): $cId = $c->CustomerId ?? $c->CustomerID ?? 0; $cName = $c->CustomerNameBN ?? $c->CustomerNameEN ?? $c->CustomerName ?? 'N/A'; ?><option value="<?php echo $cId; ?>"><?php echo htmlspecialchars($cName.' ('.($c->Mobile ?? '').')'); ?></option><?php endforeach; ?></select></div>
                 <div class="col-md-4 mb-3"><label class="form-label">Fuel Type <span class="text-danger">*</span></label>
                     <select name="fuel_type_id" id="fuel_type_id" class="form-select select2" required><option value="">Select Fuel</option>
-                    <?php foreach($fuels as $f): ?><option value="<?php echo $f->FuelTypeID; ?>"><?php echo htmlspecialchars($f->FuelName); ?></option><?php endforeach; ?></select></div>
+                    <?php foreach($fuels as $f): ?><option value="<?php echo $f->FuelTypeID; ?>" data-rate="<?php echo $f->SellingRate ?? 0; ?>"><?php echo htmlspecialchars($f->FuelName); ?></option><?php endforeach; ?></select></div>
             </div>
             <div class="row">
                 <div class="col-md-4 mb-3"><label class="form-label">Vehicle Number</label><input type="text" name="vehicle_no" id="vehicle_no" class="form-control"></div>
-                <div class="col-md-4 mb-3"><label class="form-label">Quantity <span class="text-danger">*</span></label><input type="number" step="0.001" name="quantity" id="quantity" class="form-control" required></div>
-                <div class="col-md-4 mb-3"><label class="form-label">Rate <span class="text-danger">*</span></label><input type="number" step="0.01" name="rate" id="rate" class="form-control" required></div>
+                <div class="col-md-4 mb-3"><label class="form-label">Quantity</label><input type="number" step="0.001" name="quantity" id="quantity" class="form-control" placeholder="0.000"></div>
+                <div class="col-md-4 mb-3"><label class="form-label">Rate <span class="text-danger">*</span></label><input type="number" step="0.01" name="rate" id="rate" class="form-control" required placeholder="0.00"></div>
             </div>
             <div class="row">
-                <div class="col-md-4 mb-3"><label class="form-label">Total Amount</label><input type="number" step="0.01" name="total_amount" id="total_amount" class="form-control" readonly></div>
+                <div class="col-md-4 mb-3"><label class="form-label">Total Amount (বিক্রয় টাকা) <span class="text-danger">*</span></label><input type="number" step="0.01" name="total_amount" id="total_amount" class="form-control" required placeholder="0.00"></div>
                 <div class="col-md-4 mb-3"><label class="form-label">Paid Amount</label><input type="number" step="0.01" name="paid_amount" id="paid_amount" class="form-control" value="0"></div>
                 <div class="col-md-4 mb-3"><label class="form-label">Due Amount</label><input type="number" step="0.01" name="due_amount" id="due_amount" class="form-control" readonly></div>
             </div>
@@ -63,19 +63,151 @@ $data = $objQuery->index("SELECT cd.*, c.CustomerName, c.Mobile, ft.FuelName FRO
 </div></div></div>
 <script>
 $(document).ready(function() {
+    let lastSource = 'qty';
+
     function calcDue() {
-        const qty = parseFloat($('#quantity').val()) || 0;
-        const rate = parseFloat($('#rate').val()) || 0;
-        const total = qty * rate;
+        const qtyVal = $('#quantity').val();
+        const rateVal = $('#rate').val();
+        const totalVal = $('#total_amount').val();
+        
+        const qty = parseFloat(qtyVal) || 0;
+        const rate = parseFloat(rateVal) || 0;
+        const total = parseFloat(totalVal) || 0;
         const paid = parseFloat($('#paid_amount').val()) || 0;
-        $('#total_amount').val(total.toFixed(2));
-        $('#due_amount').val(Math.max(0, total - paid).toFixed(2));
+
+        let finalTotal = total;
+
+        if (lastSource === 'total') {
+            finalTotal = total;
+            if (rate > 0 && totalVal !== '') {
+                const calcQty = total / rate;
+                $('#quantity').val(calcQty > 0 ? calcQty.toFixed(3) : '');
+            }
+        } else if (lastSource === 'qty') {
+            if (rate > 0 && qtyVal !== '') {
+                finalTotal = qty * rate;
+                $('#total_amount').val(finalTotal > 0 ? finalTotal.toFixed(2) : '');
+            }
+        } else if (lastSource === 'rate') {
+            if (total > 0 && (qty === 0 || totalVal !== '')) {
+                const calcQty = total / rate;
+                $('#quantity').val(calcQty > 0 ? calcQty.toFixed(3) : '');
+                finalTotal = total;
+            } else if (qty > 0) {
+                finalTotal = qty * rate;
+                $('#total_amount').val(finalTotal > 0 ? finalTotal.toFixed(2) : '');
+            }
+        }
+
+        const due = Math.max(0, finalTotal - paid);
+        $('#due_amount').val(due.toFixed(2));
     }
-    $('#quantity, #rate, #paid_amount').on('input', calcDue);
-    $('#addModal').on('show.bs.modal', function(e) { if(!$(e.relatedTarget).hasClass('edit-btn')){ $('#dataForm')[0].reset();$('#edit_id').val('');$('#txn_date').val('<?php echo today(); ?>');$('#modalTitle').html('<i class="fas fa-plus-circle me-2"></i>Add New Due'); } });
-    $(document).on('click', '.edit-btn', function() { const b=$(this);$('#edit_id').val(b.data('id'));$('#txn_date').val(b.data('date'));$('#customer_id').val(b.data('customer')).trigger('change');$('#fuel_type_id').val(b.data('fuel')).trigger('change');$('#vehicle_no').val(b.data('vehicle'));$('#quantity').val(b.data('qty'));$('#rate').val(b.data('rate'));$('#total_amount').val(b.data('total'));$('#paid_amount').val(b.data('paid'));$('#due_amount').val(b.data('due'));$('#remarks').val(b.data('remarks'));$('#modalTitle').html('<i class="fas fa-edit me-2"></i>Edit Due');$('#addModal').modal('show'); });
-    $('#dataForm').on('submit', function(e) { e.preventDefault();const f=$(this),btn=f.find('[type="submit"]'),orig=btn.html();btn.prop('disabled',true).html('<i class="fas fa-spinner fa-spin"></i> Processing...');$.ajax({url:f.attr('action'),type:'POST',data:f.serialize(),dataType:'json',success:function(r){if(r.success){showNotification(r.message,'success');$('#addModal').modal('hide');setTimeout(()=>location.reload(),500);}else showNotification(r.message,'error');},error:function(){showNotification('Error!','error');},complete:function(){btn.prop('disabled',false).html(orig);}});});
-    $(document).on('click', '.delete-btn', function() { if(!confirmDelete()) return;const b=$(this),id=b.data('id');b.prop('disabled',true).html('<i class="fas fa-spinner fa-spin"></i>');$.ajax({url:'../../modules/entry/customer_due_entry.php',type:'POST',data:{action:'delete',record_id:id},dataType:'json',success:function(r){if(r.success){showNotification(r.message,'success');setTimeout(()=>location.reload(),500);}else showNotification(r.message,'error');},complete:function(){b.prop('disabled',false).html('<i class="fas fa-trash"></i>');}});});
+
+    $('#quantity').on('input', function() {
+        lastSource = 'qty';
+        calcDue();
+    });
+
+    $('#total_amount').on('input', function() {
+        lastSource = 'total';
+        calcDue();
+    });
+
+    $('#rate').on('input', function() {
+        calcDue();
+    });
+
+    $('#paid_amount').on('input', function() {
+        calcDue();
+    });
+
+    $('#fuel_type_id').on('change', function() {
+        const selectedOption = $(this).find('option:selected');
+        const defaultRate = parseFloat(selectedOption.data('rate')) || 0;
+        if (defaultRate > 0) {
+            $('#rate').val(defaultRate);
+            calcDue();
+        }
+    });
+
+    $('#addModal').on('show.bs.modal', function(e) {
+        if(!$(e.relatedTarget).hasClass('edit-btn')){
+            $('#dataForm')[0].reset();
+            $('#edit_id').val('');
+            $('#txn_date').val('<?php echo today(); ?>');
+            $('#customer_id').val('').trigger('change');
+            $('#fuel_type_id').val('').trigger('change');
+            $('#modalTitle').html('<i class="fas fa-plus-circle me-2"></i>Add New Due');
+            lastSource = 'qty';
+        }
+    });
+
+    $(document).on('click', '.edit-btn', function() {
+        const b=$(this);
+        $('#edit_id').val(b.data('id'));
+        $('#txn_date').val(b.data('date'));
+        $('#customer_id').val(b.data('customer')).trigger('change');
+        $('#fuel_type_id').val(b.data('fuel')).trigger('change');
+        $('#vehicle_no').val(b.data('vehicle'));
+        $('#quantity').val(b.data('qty'));
+        $('#rate').val(b.data('rate'));
+        $('#total_amount').val(b.data('total'));
+        $('#paid_amount').val(b.data('paid'));
+        $('#due_amount').val(b.data('due'));
+        $('#remarks').val(b.data('remarks'));
+        $('#modalTitle').html('<i class="fas fa-edit me-2"></i>Edit Due');
+        lastSource = 'total';
+        $('#addModal').modal('show');
+    });
+
+    $('#dataForm').on('submit', function(e) {
+        e.preventDefault();
+        calcDue();
+        const f=$(this),btn=f.find('[type="submit"]'),orig=btn.html();
+        btn.prop('disabled',true).html('<i class="fas fa-spinner fa-spin"></i> Processing...');
+        $.ajax({
+            url:f.attr('action'),
+            type:'POST',
+            data:f.serialize(),
+            dataType:'json',
+            success:function(r){
+                if(r.success){
+                    showNotification(r.message,'success');
+                    $('#addModal').modal('hide');
+                    setTimeout(()=>location.reload(),500);
+                } else showNotification(r.message,'error');
+            },
+            error:function(xhr){
+                let msg = 'Error!';
+                if (xhr.responseJSON && xhr.responseJSON.message) {
+                    msg = xhr.responseJSON.message;
+                } else if (xhr.responseText) {
+                    msg = xhr.responseText.replace(/<[^>]+>/g, '').trim().substring(0, 150) || 'Error!';
+                }
+                showNotification(msg,'error');
+            },
+            complete:function(){btn.prop('disabled',false).html(orig);}
+        });
+    });
+
+    $(document).on('click', '.delete-btn', function() {
+        if(!confirmDelete()) return;
+        const b=$(this),id=b.data('id');
+        b.prop('disabled',true).html('<i class="fas fa-spinner fa-spin"></i>');
+        $.ajax({
+            url:'../../modules/entry/customer_due_entry.php',
+            type:'POST',
+            data:{action:'delete',record_id:id},
+            dataType:'json',
+            success:function(r){
+                if(r.success){
+                    showNotification(r.message,'success');
+                    setTimeout(()=>location.reload(),500);
+                } else showNotification(r.message,'error');
+            },
+            complete:function(){b.prop('disabled',false).html('<i class="fas fa-trash"></i>');}
+        });
+    });
 });
 </script>
 <?php require_once __DIR__ . '/../../includes/footer.php'; ?>

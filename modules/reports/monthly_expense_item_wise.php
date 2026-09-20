@@ -96,13 +96,34 @@ if ($lang === 'en') {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// DATA QUERIES
+// DATA QUERIES & HELPER
 // ─────────────────────────────────────────────────────────────────────────────
+ensurePersonTitlesTableSchema();
+
+function getExpenseParticularFormattedName($d, $lang = 'bn') {
+    // 1. Check mst_expenseparticular
+    if (!empty($d->ParticularNameEN) || !empty($d->ParticularNameBN)) {
+        return $lang === 'en'
+            ? (!empty($d->ParticularNameEN) ? $d->ParticularNameEN : ($d->ParticularNameBN ?? '—'))
+            : (!empty($d->ParticularNameBN) ? $d->ParticularNameBN : ($d->ParticularNameEN ?? '—'));
+    }
+    // 2. Check mst_employee
+    if (!empty($d->EmpNameEN) || !empty($d->EmpNameBN)) {
+        return formatPersonTitleName($d->EmpTitleEN ?? '', $d->EmpTitleBN ?? '', $d->EmpNameEN ?? '', $d->EmpNameBN ?? '', $lang);
+    }
+    // 3. Check mst_shareholder
+    if (!empty($d->ShNameEN) || !empty($d->ShNameBN)) {
+        return formatPersonTitleName($d->ShTitleEN ?? '', $d->ShTitleBN ?? '', $d->ShNameEN ?? '', $d->ShNameBN ?? '', $lang);
+    }
+    // Fallback
+    return $d->ParticularID ?? '';
+}
+
 // 1. Expense Particular Group Summary Query (Category-wise summary)
 $sqlCategorySummary = "SELECT 
-    COALESCE(ec.ExpenseCategoryID, ec_sal.ExpenseCategoryID, 11) AS ExpenseCategoryID,
-    COALESCE(ec.CategoryNameEN, ec_sal.CategoryNameEN, 'Salary') AS CategoryNameEN,
-    COALESCE(ec.CategoryNameBN, ec_sal.CategoryNameBN, 'বেতন') AS CategoryNameBN,
+    COALESCE(ec.ExpenseCategoryID, ec_sal.ExpenseCategoryID, ec_sh.ExpenseCategoryID, 11) AS ExpenseCategoryID,
+    COALESCE(ec.CategoryNameEN, ec_sal.CategoryNameEN, ec_sh.CategoryNameEN, 'Salary') AS CategoryNameEN,
+    COALESCE(ec.CategoryNameBN, ec_sal.CategoryNameBN, ec_sh.CategoryNameBN, 'বেতন') AS CategoryNameBN,
     SUM(e.Amount) AS CategoryTotal,
     COUNT(*) AS CategoryEntries
 FROM trx_expense e
@@ -119,12 +140,19 @@ LEFT JOIN mst_expensecategory ec_sal
     ON (emp.Id IS NOT NULL OR emp.EmployeeId IS NOT NULL) 
     AND (ec_sal.ExpenseCategoryID = 11 OR ec_sal.CategoryNameEN = 'Salary')
     AND ec_sal.IsDeleted = 0
+LEFT JOIN mst_shareholder sh 
+    ON (e.ParticularID = sh.ShareHolderID OR e.ParticularID = CAST(sh.Id AS CHAR) OR e.ParticularID = CONCAT('SH', sh.Id) OR e.ParticularID = CONCAT('SH', sh.ShareHolderID) OR e.ParticularID = CONCAT('S_', sh.Id) OR e.ParticularID = CONCAT('S_', sh.ShareHolderID))
+    AND sh.IsDeleted = 0
+LEFT JOIN mst_expensecategory ec_sh 
+    ON (sh.Id IS NOT NULL OR sh.ShareHolderID IS NOT NULL) 
+    AND (ec_sh.ExpenseCategoryID = 11 OR ec_sh.CategoryNameEN = 'Salary')
+    AND ec_sh.IsDeleted = 0
 WHERE e.ExpenseDate BETWEEN ? AND ?
   AND e.IsActive = 1 AND e.IsDeleted = 0
 GROUP BY 
-    COALESCE(ec.ExpenseCategoryID, ec_sal.ExpenseCategoryID, 11),
-    COALESCE(ec.CategoryNameEN, ec_sal.CategoryNameEN, 'Salary'),
-    COALESCE(ec.CategoryNameBN, ec_sal.CategoryNameBN, 'বেতন')
+    COALESCE(ec.ExpenseCategoryID, ec_sal.ExpenseCategoryID, ec_sh.ExpenseCategoryID, 11),
+    COALESCE(ec.CategoryNameEN, ec_sal.CategoryNameEN, ec_sh.CategoryNameEN, 'Salary'),
+    COALESCE(ec.CategoryNameBN, ec_sal.CategoryNameBN, ec_sh.CategoryNameBN, 'বেতন')
 ORDER BY CategoryTotal DESC, CategoryNameEN ASC";
 
 $categorySummaryRecords = $objQuery->index($sqlCategorySummary, [$startDate, $endDate]);
@@ -137,15 +165,15 @@ foreach ($categorySummaryRecords as $cs) {
 }
 
 if ($reportType === 'summary') {
-    // 2. Summary query grouped by Particular (handles both mst_expenseparticular and mst_employee)
+    // 2. Summary query grouped by Particular (handles mst_expenseparticular, mst_employee, mst_shareholder)
     $sqlSummary = "SELECT 
                 e.ParticularID AS KeyParticularID,
-                COALESCE(ep.ParticularID, emp.EmployeeId, e.ParticularID) AS ParticularID,
-                COALESCE(ep.ParticularNameEN, emp.NameEN, e.ParticularID) AS ParticularNameEN,
-                COALESCE(ep.ParticularNameBN, emp.NameBN, emp.NameEN, e.ParticularID) AS ParticularNameBN,
-                COALESCE(ec.ExpenseCategoryID, ec_sal.ExpenseCategoryID, 11) AS ExpenseCategoryID,
-                COALESCE(ec.CategoryNameEN, ec_sal.CategoryNameEN, 'Salary') AS CategoryNameEN,
-                COALESCE(ec.CategoryNameBN, ec_sal.CategoryNameBN, 'বেতন') AS CategoryNameBN,
+                COALESCE(ep.ParticularID, emp.EmployeeId, sh.ShareHolderID, e.ParticularID) AS ParticularID,
+                COALESCE(ep.ParticularNameEN, emp.NameEN, sh.NameEN, e.ParticularID) AS ParticularNameEN,
+                COALESCE(ep.ParticularNameBN, emp.NameBN, sh.NameBN, emp.NameEN, sh.NameEN, e.ParticularID) AS ParticularNameBN,
+                COALESCE(ec.ExpenseCategoryID, ec_sal.ExpenseCategoryID, ec_sh.ExpenseCategoryID, 11) AS ExpenseCategoryID,
+                COALESCE(ec.CategoryNameEN, ec_sal.CategoryNameEN, ec_sh.CategoryNameEN, 'Salary') AS CategoryNameEN,
+                COALESCE(ec.CategoryNameBN, ec_sal.CategoryNameBN, ec_sh.CategoryNameBN, 'বেতন') AS CategoryNameBN,
                 SUM(e.Amount) AS TotalAmount,
                 COUNT(*) AS EntryCount
             FROM trx_expense e
@@ -162,22 +190,35 @@ if ($reportType === 'summary') {
                 ON (emp.Id IS NOT NULL OR emp.EmployeeId IS NOT NULL) 
                 AND (ec_sal.ExpenseCategoryID = 11 OR ec_sal.CategoryNameEN = 'Salary')
                 AND ec_sal.IsDeleted = 0
+            LEFT JOIN mst_shareholder sh 
+                ON (e.ParticularID = sh.ShareHolderID OR e.ParticularID = CAST(sh.Id AS CHAR) OR e.ParticularID = CONCAT('SH', sh.Id) OR e.ParticularID = CONCAT('SH', sh.ShareHolderID) OR e.ParticularID = CONCAT('S_', sh.Id) OR e.ParticularID = CONCAT('S_', sh.ShareHolderID))
+                AND sh.IsDeleted = 0
+            LEFT JOIN mst_expensecategory ec_sh 
+                ON (sh.Id IS NOT NULL OR sh.ShareHolderID IS NOT NULL) 
+                AND (ec_sh.ExpenseCategoryID = 11 OR ec_sh.CategoryNameEN = 'Salary')
+                AND ec_sh.IsDeleted = 0
             WHERE e.ExpenseDate BETWEEN ? AND ?
               AND e.IsActive = 1 AND e.IsDeleted = 0
             GROUP BY 
                 e.ParticularID,
                 ep.ParticularID,
                 emp.EmployeeId,
+                sh.ShareHolderID,
                 ep.ParticularNameEN,
                 emp.NameEN,
+                sh.NameEN,
                 ep.ParticularNameBN,
                 emp.NameBN,
+                sh.NameBN,
                 ec.ExpenseCategoryID,
                 ec.CategoryNameEN,
                 ec.CategoryNameBN,
                 ec_sal.ExpenseCategoryID,
                 ec_sal.CategoryNameEN,
-                ec_sal.CategoryNameBN
+                ec_sal.CategoryNameBN,
+                ec_sh.ExpenseCategoryID,
+                ec_sh.CategoryNameEN,
+                ec_sh.CategoryNameBN
             ORDER BY CategoryNameEN ASC, ParticularNameEN ASC";
 
     $records = $objQuery->index($sqlSummary, [$startDate, $endDate]);
@@ -196,11 +237,19 @@ if ($reportType === 'summary') {
         pm.MethodName,
         e.ReferenceNo,
         e.Remarks,
-        COALESCE(ep.ParticularNameEN, emp.NameEN, e.ParticularID) AS ParticularNameEN,
-        COALESCE(ep.ParticularNameBN, emp.NameBN, emp.NameEN, e.ParticularID) AS ParticularNameBN,
-        COALESCE(ec.ExpenseCategoryID, ec_sal.ExpenseCategoryID, 11) AS ExpenseCategoryID,
-        COALESCE(ec.CategoryNameEN, ec_sal.CategoryNameEN, 'Salary') AS CategoryNameEN,
-        COALESCE(ec.CategoryNameBN, ec_sal.CategoryNameBN, 'বেতন') AS CategoryNameBN
+        ep.ParticularNameEN,
+        ep.ParticularNameBN,
+        emp.NameEN AS EmpNameEN,
+        emp.NameBN AS EmpNameBN,
+        emp.TitleEN AS EmpTitleEN,
+        emp.TitleBN AS EmpTitleBN,
+        sh.NameEN AS ShNameEN,
+        sh.NameBN AS ShNameBN,
+        sh.TitleEN AS ShTitleEN,
+        sh.TitleBN AS ShTitleBN,
+        COALESCE(ec.ExpenseCategoryID, ec_sal.ExpenseCategoryID, ec_sh.ExpenseCategoryID, 11) AS ExpenseCategoryID,
+        COALESCE(ec.CategoryNameEN, ec_sal.CategoryNameEN, ec_sh.CategoryNameEN, 'Salary') AS CategoryNameEN,
+        COALESCE(ec.CategoryNameBN, ec_sal.CategoryNameBN, ec_sh.CategoryNameBN, 'বেতন') AS CategoryNameBN
     FROM trx_expense e
     LEFT JOIN mst_expenseparticular ep 
         ON (e.ParticularID = ep.ParticularID OR e.ParticularID = CAST(ep.ExpenseParticularID AS CHAR))
@@ -215,10 +264,17 @@ if ($reportType === 'summary') {
         ON (emp.Id IS NOT NULL OR emp.EmployeeId IS NOT NULL) 
         AND (ec_sal.ExpenseCategoryID = 11 OR ec_sal.CategoryNameEN = 'Salary')
         AND ec_sal.IsDeleted = 0
+    LEFT JOIN mst_shareholder sh 
+        ON (e.ParticularID = sh.ShareHolderID OR e.ParticularID = CAST(sh.Id AS CHAR) OR e.ParticularID = CONCAT('SH', sh.Id) OR e.ParticularID = CONCAT('SH', sh.ShareHolderID) OR e.ParticularID = CONCAT('S_', sh.Id) OR e.ParticularID = CONCAT('S_', sh.ShareHolderID))
+        AND sh.IsDeleted = 0
+    LEFT JOIN mst_expensecategory ec_sh 
+        ON (sh.Id IS NOT NULL OR sh.ShareHolderID IS NOT NULL) 
+        AND (ec_sh.ExpenseCategoryID = 11 OR ec_sh.CategoryNameEN = 'Salary')
+        AND ec_sh.IsDeleted = 0
     LEFT JOIN cfg_paymentmethod pm ON e.PaymentMethodID = pm.PaymentMethodID
     WHERE e.ExpenseDate BETWEEN ? AND ?
       AND e.IsActive = 1 AND e.IsDeleted = 0
-    ORDER BY ParticularNameEN ASC, e.ExpenseDate ASC, e.ExpenseID ASC";
+    ORDER BY e.ExpenseDate ASC, e.ExpenseID ASC";
 
     $detailRecords = $objQuery->index($sqlDetails, [$startDate, $endDate]);
 
@@ -228,9 +284,7 @@ if ($reportType === 'summary') {
         $pid   = $d->ParticularID;
         $catId = $d->ExpenseCategoryID;
 
-        $particularName = $lang === 'en'
-            ? (!empty($d->ParticularNameEN) ? $d->ParticularNameEN : ($d->ParticularNameBN ?? '—'))
-            : (!empty($d->ParticularNameBN) ? $d->ParticularNameBN : ($d->ParticularNameEN ?? '—'));
+        $particularName = getExpenseParticularFormattedName($d, $lang);
 
         $amountVal = floatval($d->Amount);
 
@@ -289,11 +343,19 @@ if ($reportType === 'summary') {
         e.ReferenceNo,
         e.Remarks,
         pm.MethodName,
-        COALESCE(ep.ParticularNameEN, emp.NameEN, e.ParticularID) AS ParticularNameEN,
-        COALESCE(ep.ParticularNameBN, emp.NameBN, emp.NameEN, e.ParticularID) AS ParticularNameBN,
-        COALESCE(ec.ExpenseCategoryID, ec_sal.ExpenseCategoryID, 11) AS ExpenseCategoryID,
-        COALESCE(ec.CategoryNameEN, ec_sal.CategoryNameEN, 'Salary') AS CategoryNameEN,
-        COALESCE(ec.CategoryNameBN, ec_sal.CategoryNameBN, 'বেতন') AS CategoryNameBN
+        ep.ParticularNameEN,
+        ep.ParticularNameBN,
+        emp.NameEN AS EmpNameEN,
+        emp.NameBN AS EmpNameBN,
+        emp.TitleEN AS EmpTitleEN,
+        emp.TitleBN AS EmpTitleBN,
+        sh.NameEN AS ShNameEN,
+        sh.NameBN AS ShNameBN,
+        sh.TitleEN AS ShTitleEN,
+        sh.TitleBN AS ShTitleBN,
+        COALESCE(ec.ExpenseCategoryID, ec_sal.ExpenseCategoryID, ec_sh.ExpenseCategoryID, 11) AS ExpenseCategoryID,
+        COALESCE(ec.CategoryNameEN, ec_sal.CategoryNameEN, ec_sh.CategoryNameEN, 'Salary') AS CategoryNameEN,
+        COALESCE(ec.CategoryNameBN, ec_sal.CategoryNameBN, ec_sh.CategoryNameBN, 'বেতন') AS CategoryNameBN
     FROM trx_expense e
     LEFT JOIN mst_expenseparticular ep 
         ON (e.ParticularID = ep.ParticularID OR e.ParticularID = CAST(ep.ExpenseParticularID AS CHAR))
@@ -308,10 +370,17 @@ if ($reportType === 'summary') {
         ON (emp.Id IS NOT NULL OR emp.EmployeeId IS NOT NULL) 
         AND (ec_sal.ExpenseCategoryID = 11 OR ec_sal.CategoryNameEN = 'Salary')
         AND ec_sal.IsDeleted = 0
+    LEFT JOIN mst_shareholder sh 
+        ON (e.ParticularID = sh.ShareHolderID OR e.ParticularID = CAST(sh.Id AS CHAR) OR e.ParticularID = CONCAT('SH', sh.Id) OR e.ParticularID = CONCAT('SH', sh.ShareHolderID) OR e.ParticularID = CONCAT('S_', sh.Id) OR e.ParticularID = CONCAT('S_', sh.ShareHolderID))
+        AND sh.IsDeleted = 0
+    LEFT JOIN mst_expensecategory ec_sh 
+        ON (sh.Id IS NOT NULL OR sh.ShareHolderID IS NOT NULL) 
+        AND (ec_sh.ExpenseCategoryID = 11 OR ec_sh.CategoryNameEN = 'Salary')
+        AND ec_sh.IsDeleted = 0
     LEFT JOIN cfg_paymentmethod pm ON e.PaymentMethodID = pm.PaymentMethodID
     WHERE e.ExpenseDate BETWEEN ? AND ?
       AND e.IsActive = 1 AND e.IsDeleted = 0
-    ORDER BY ParticularNameEN ASC, e.ExpenseDate ASC, e.ExpenseID ASC";
+    ORDER BY e.ExpenseDate ASC, e.ExpenseID ASC";
 
     $fullDetailRecords = $objQuery->index($sqlFullDetails, [$startDate, $endDate]);
 
@@ -329,9 +398,7 @@ if ($reportType === 'summary') {
 
         $catId = $f->ExpenseCategoryID;
         $pid   = $f->ParticularID;
-        $particularName = $lang === 'en'
-            ? (!empty($f->ParticularNameEN) ? $f->ParticularNameEN : ($f->ParticularNameBN ?? '—'))
-            : (!empty($f->ParticularNameBN) ? $f->ParticularNameBN : ($f->ParticularNameEN ?? '—'));
+        $particularName = getExpenseParticularFormattedName($f, $lang);
 
         if (!isset($groupParticularSummaryMap[$catId])) {
             $groupParticularSummaryMap[$catId] = [];

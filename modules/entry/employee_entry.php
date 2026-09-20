@@ -3,6 +3,9 @@ require_once __DIR__ . '/../../config/database.php';
 require_once __DIR__ . '/../../includes/functions.php';
 if (session_status() === PHP_SESSION_NONE) session_start();
 if (!isset($_SESSION['user_id'])) jsonResponse(false, 'Authentication required!');
+
+ensurePersonTitlesTableSchema();
+
 $action = $_POST['action'] ?? '';
 switch ($action) {
     case 'save': handleSave(); break;
@@ -36,6 +39,8 @@ function handleSave() {
     $expCatId = intval($_POST['expense_category_id'] ?? 11);
     if ($expCatId <= 0) $expCatId = 11;
 
+    $titleEn = sanitize($_POST['title_en'] ?? '');
+    $titleBn = sanitize($_POST['title_bn'] ?? '');
     $nameEn = sanitize($_POST['name_en'] ?? '');
     $nameBn = sanitize($_POST['name_bn'] ?? '');
     $father = sanitize($_POST['father'] ?? '');
@@ -53,10 +58,10 @@ function handleSave() {
     if (empty($nameEn) || empty($nameBn)) jsonResponse(false, 'Name (EN) and Name (BN) are required!');
 
     if ($id > 0) {
-        $objQuery->inUpDel("UPDATE mst_employee SET ExpenseCategoryID=?, NameEN=?, NameBN=?, FatherName=?, MotherName=?, DateOfBirth=?, JoiningDate=?, Mobile=?, Address=?, NationalID=?, Guarantor=?, Salary=?, Remarks=?, IsActive=?, UpdatedBy=?, UpdatedAt=NOW() WHERE Id=? AND IsDeleted=0", [$expCatId, $nameEn, $nameBn, $father, $mother, $dob, $joining, $mobile, $address, $nid, $guarantor, $salary, $remarks, $active, getUserId(), $id]);
+        $objQuery->inUpDel("UPDATE mst_employee SET ExpenseCategoryID=?, TitleEN=?, TitleBN=?, NameEN=?, NameBN=?, FatherName=?, MotherName=?, DateOfBirth=?, JoiningDate=?, Mobile=?, Address=?, NationalID=?, Guarantor=?, Salary=?, Remarks=?, IsActive=?, UpdatedBy=?, UpdatedAt=NOW() WHERE Id=? AND IsDeleted=0", [$expCatId, $titleEn, $titleBn, $nameEn, $nameBn, $father, $mother, $dob, $joining, $mobile, $address, $nid, $guarantor, $salary, $remarks, $active, getUserId(), $id]);
         jsonResponse(true, 'Employee updated successfully!');
     } else {
-        $objQuery->inUpDel("INSERT INTO mst_employee (ExpenseCategoryID, NameEN, NameBN, FatherName, MotherName, DateOfBirth, JoiningDate, Mobile, Address, NationalID, Guarantor, Salary, Remarks, CreatedBy, IsActive) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", [$expCatId, $nameEn, $nameBn, $father, $mother, $dob, $joining, $mobile, $address, $nid, $guarantor, $salary, $remarks, getUserId(), $active]);
+        $objQuery->inUpDel("INSERT INTO mst_employee (ExpenseCategoryID, TitleEN, TitleBN, NameEN, NameBN, FatherName, MotherName, DateOfBirth, JoiningDate, Mobile, Address, NationalID, Guarantor, Salary, Remarks, CreatedBy, IsActive) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", [$expCatId, $titleEn, $titleBn, $nameEn, $nameBn, $father, $mother, $dob, $joining, $mobile, $address, $nid, $guarantor, $salary, $remarks, getUserId(), $active]);
         $newId = $objQuery->getLastInsertId();
         $eid = 'EMP' . $newId;
         $objQuery->inUpDel("UPDATE mst_employee SET EmployeeId=? WHERE Id=?", [$eid, $newId]);

@@ -16,6 +16,9 @@ date_default_timezone_set('Asia/Dhaka');
 function db()
 {
     global $objQuery;
+    if (!$objQuery) {
+        require_once __DIR__ . '/../config/database.php';
+    }
     return $objQuery;
 }
 
@@ -408,6 +411,9 @@ function t($key)
         ],
         'bn' => [
             'Dashboard' => 'ড্যাশবোর্ড',
+            'Previous Data Entry' => 'পূর্ববর্তী ডাটা এন্ট্রি',
+            'Add Bulk Collection' => 'বাল্ক কালেকশন যুক্ত করুন',
+            'Previous Customer Dues' => 'পূর্ববর্তী কাস্টমার বকেয়া',
             'Master Data' => 'মাস্টার ডাটা',
             'Operations' => 'অপারেশন',
             'Reports' => 'রিপোর্ট',
@@ -715,4 +721,268 @@ function ensureStockAdjustmentTableExist()
         // Safe fallback
     }
 }
+
+/**
+ * Ensure trx_customerdue_Previous table exists
+ */
+function ensureCustomerDuePreviousTableExists()
+{
+    static $checked = false;
+    if ($checked) return;
+    $checked = true;
+
+    $sql = "CREATE TABLE IF NOT EXISTS `trx_customerdue_Previous` (
+      `CustomerDuePreviousID` int(11) NOT NULL AUTO_INCREMENT,
+      `TxnDate` date NOT NULL,
+      `CustomerID` int(11) NOT NULL COMMENT 'Logical FK -> mst_Customer / mst_Employee / mst_Shareholder',
+      `CustomerType` varchar(30) NOT NULL DEFAULT 'Customer',
+      `TotalAmount` decimal(14,2) NOT NULL DEFAULT 0.00,
+      `PaidAmount` decimal(14,2) NOT NULL DEFAULT 0.00,
+      `DueAmount` decimal(14,2) NOT NULL DEFAULT 0.00,
+      `Remarks` varchar(255) DEFAULT NULL,
+      `CreatedBy` int(11) DEFAULT NULL,
+      `CreatedAt` datetime NOT NULL DEFAULT current_timestamp(),
+      `UpdatedBy` int(11) DEFAULT NULL,
+      `UpdatedAt` datetime NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+      `IsActive` tinyint(1) NOT NULL DEFAULT 1,
+      `IsDeleted` tinyint(1) NOT NULL DEFAULT 0,
+      PRIMARY KEY (`CustomerDuePreviousID`),
+      KEY `idx_prev_date` (`TxnDate`),
+      KEY `idx_prev_customer` (`CustomerID`, `CustomerType`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Historical customer due records prior to software launch cutoff';";
+
+    try {
+        db()->inUpDel($sql);
+    } catch (\Throwable $e) {
+        // Table creation fallback
+    }
+
+    try {
+        $cols = db()->index("SHOW COLUMNS FROM `trx_customerdue_Previous`");
+        $colNames = [];
+        foreach ($cols as $c) {
+            $colNames[] = is_object($c) ? ($c->Field ?? '') : ($c['Field'] ?? '');
+        }
+        if (!in_array('CustomerType', $colNames)) {
+            db()->inUpDel("ALTER TABLE `trx_customerdue_Previous` ADD COLUMN `CustomerType` varchar(30) NOT NULL DEFAULT 'Customer' AFTER `CustomerID`");
+        }
+    } catch (\Throwable $e) {
+        // Safe fallback
+    }
+}
+
+/**
+ * Ensure trx_Customer_Due_Opening table exists
+ */
+function ensureCustomerDueOpeningTableExists()
+{
+    static $checked = false;
+    if ($checked) return;
+    $checked = true;
+
+    $sql = "CREATE TABLE IF NOT EXISTS `trx_Customer_Due_Opening` (
+      `OpeningDueID` int(11) NOT NULL AUTO_INCREMENT,
+      `TxnDate` date NOT NULL,
+      `CustomerID` int(11) NOT NULL COMMENT 'Logical FK -> mst_Customer / mst_Employee / mst_Shareholder',
+      `CustomerType` varchar(30) NOT NULL DEFAULT 'Customer',
+      `SalesAmount` decimal(14,2) NOT NULL DEFAULT 0.00,
+      `Payment` decimal(14,2) NOT NULL DEFAULT 0.00,
+      `Balance` decimal(14,2) NOT NULL DEFAULT 0.00,
+      `Remarks` varchar(255) DEFAULT NULL,
+      `CreatedBy` int(11) DEFAULT NULL,
+      `CreatedAt` datetime NOT NULL DEFAULT current_timestamp(),
+      `UpdatedBy` int(11) DEFAULT NULL,
+      `UpdatedAt` datetime NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+      `IsActive` tinyint(1) NOT NULL DEFAULT 1,
+      `IsDeleted` tinyint(1) NOT NULL DEFAULT 0,
+      PRIMARY KEY (`OpeningDueID`),
+      KEY `idx_open_date` (`TxnDate`),
+      KEY `idx_open_customer` (`CustomerID`, `CustomerType`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Historical customer due and payment records prior to software launch';";
+
+    try {
+        db()->inUpDel($sql);
+        
+        // Auto-migrate column LPGPurchase -> SalesAmount if table already exists in DB
+        $checkCol = db()->index("SHOW COLUMNS FROM `trx_Customer_Due_Opening` LIKE 'LPGPurchase'");
+        if (!empty($checkCol)) {
+            db()->inUpDel("ALTER TABLE `trx_Customer_Due_Opening` CHANGE COLUMN `LPGPurchase` `SalesAmount` DECIMAL(14,2) NOT NULL DEFAULT 0.00");
+        }
+    } catch (\Throwable $e) {
+        // Table creation fallback
+    }
+}
+
+/**
+ * Helper to parse composite entity selection (e.g. C_101, E_5, S_2)
+ */
+if (!function_exists('parseSelectedEntity')) {
+    function parseSelectedEntity($val) {
+        $val = trim((string)$val);
+        $parts = explode('_', $val);
+        if (count($parts) === 2) {
+            $code = strtoupper($parts[0]);
+            $id = intval($parts[1]);
+            $type = 'Customer';
+            if ($code === 'E') $type = 'Employee';
+            if ($code === 'S') $type = 'Shareholder';
+            return ['type' => $type, 'id' => $id, 'val' => $code . '_' . $id];
+        }
+        $id = intval($val);
+        return ['type' => 'Customer', 'id' => $id, 'val' => ($id > 0 ? 'C_' . $id : '')];
+    }
+}
+
+/**
+ * Ensure CustomerType column exists in trx_customercollection
+ */
+function ensureCustomerCollectionTableSchema()
+{
+    static $checked = false;
+    if ($checked) return;
+    $checked = true;
+
+    try {
+        $cols = db()->index("SHOW COLUMNS FROM `trx_customercollection` LIKE 'CustomerType'");
+        if (empty($cols)) {
+            db()->inUpDel("ALTER TABLE `trx_customercollection` ADD COLUMN `CustomerType` VARCHAR(30) NOT NULL DEFAULT 'Customer' AFTER `CustomerID`");
+        }
+    } catch (\Throwable $e) {
+        // Migration fallback
+    }
+}
+
+/**
+ * Ensure CustomerType column exists in trx_customerdue
+ */
+function ensureCustomerDueTableSchema()
+{
+    static $checked = false;
+    if ($checked) return;
+    $checked = true;
+
+    try {
+        $cols = db()->index("SHOW COLUMNS FROM `trx_customerdue` LIKE 'CustomerType'");
+        if (empty($cols)) {
+            db()->inUpDel("ALTER TABLE `trx_customerdue` ADD COLUMN `CustomerType` VARCHAR(30) NOT NULL DEFAULT 'Customer' AFTER `CustomerID`");
+        }
+    } catch (\Throwable $e) {
+        // Migration fallback
+    }
+}
+
+
+/**
+ * Ensure TitleEN and TitleBN columns exist in mst_customer, mst_employee, and mst_shareholder
+ */
+function ensurePersonTitlesTableSchema()
+{
+    static $checked = false;
+    if ($checked) return;
+    $checked = true;
+
+    try {
+        $colsC = db()->index("SHOW COLUMNS FROM `mst_customer` LIKE 'TitleEN'");
+        if (empty($colsC)) {
+            db()->inUpDel("ALTER TABLE `mst_customer` ADD COLUMN `TitleEN` VARCHAR(50) NULL DEFAULT NULL, ADD COLUMN `TitleBN` VARCHAR(50) NULL DEFAULT NULL");
+        }
+    } catch (\Throwable $e) {}
+
+    try {
+        $colsE = db()->index("SHOW COLUMNS FROM `mst_employee` LIKE 'TitleEN'");
+        if (empty($colsE)) {
+            db()->inUpDel("ALTER TABLE `mst_employee` ADD COLUMN `TitleEN` VARCHAR(50) NULL DEFAULT NULL, ADD COLUMN `TitleBN` VARCHAR(50) NULL DEFAULT NULL");
+        }
+    } catch (\Throwable $e) {}
+
+    try {
+        $colsS = db()->index("SHOW COLUMNS FROM `mst_shareholder` LIKE 'TitleEN'");
+        if (empty($colsS)) {
+            db()->inUpDel("ALTER TABLE `mst_shareholder` ADD COLUMN `TitleEN` VARCHAR(50) NULL DEFAULT NULL, ADD COLUMN `TitleBN` VARCHAR(50) NULL DEFAULT NULL");
+        }
+    } catch (\Throwable $e) {}
+}
+
+if (!function_exists('formatPersonTitleName')) {
+    /**
+     * Helper to format Person Name with TitleEN / TitleBN
+     */
+    function formatPersonTitleName($titleEN, $titleBN, $nameEN, $nameBN, $lang = 'bn') {
+        $tEN = trim((string)$titleEN);
+        $tBN = trim((string)$titleBN);
+        $nEN = trim((string)$nameEN);
+        $nBN = trim((string)$nameBN);
+
+        if (empty($nEN) && empty($nBN)) {
+            return '';
+        }
+
+        if ($lang === 'en') {
+            $baseName = !empty($nEN) ? $nEN : $nBN;
+            if (!empty($tEN)) {
+                $title = $tEN;
+            } elseif (!empty($tBN)) {
+                $map = ['জনাব' => 'Mr.', 'বেগম' => 'Mrs.', 'মিস' => 'Ms.', 'ডক্টর' => 'Dr.'];
+                $title = $map[$tBN] ?? $tBN;
+            } else {
+                $title = 'Mr.';
+            }
+        } else {
+            // Bangla
+            $baseName = !empty($nBN) ? $nBN : $nEN;
+            if (!empty($tBN)) {
+                $title = $tBN;
+            } elseif (!empty($tEN)) {
+                $map = ['Mr.' => 'জনাব', 'Mr' => 'জনাব', 'Mrs.' => 'বেগম', 'Mrs' => 'বেগম', 'Ms.' => 'মিস', 'Ms' => 'মিস', 'Dr.' => 'ডক্টর'];
+                $title = $map[$tEN] ?? $tEN;
+            } else {
+                $title = 'জনাব';
+            }
+        }
+
+        return trim($title . ' ' . $baseName);
+    }
+}
+
+/**
+ * Ensure trx_historical_bulk_collection table exists
+ */
+function ensureHistoricalBulkCollectionTableExists()
+{
+    static $checked = false;
+    if ($checked) return;
+    $checked = true;
+
+    $sql = "CREATE TABLE IF NOT EXISTS `trx_historical_bulk_collection` (
+      `Id` int(11) NOT NULL AUTO_INCREMENT,
+      `TxnDate` date NOT NULL,
+      `SalesQty` decimal(14,2) NOT NULL DEFAULT 0.00 COMMENT 'Sales Quantity in Liter',
+      `SalesAmount` decimal(14,2) NOT NULL DEFAULT 0.00 COMMENT 'Sales Amount',
+      `Rate` decimal(14,2) NOT NULL DEFAULT 0.00 COMMENT 'Rate = SalesAmount / SalesQty',
+      `OtherCollection` decimal(14,2) NOT NULL DEFAULT 0.00 COMMENT 'Other Collection',
+      `TotalCollection` decimal(14,2) NOT NULL DEFAULT 0.00 COMMENT 'Total Collection',
+      `CommissionRate` decimal(10,2) NOT NULL DEFAULT 0.00 COMMENT 'Commission Rate %',
+      `CommissionAmount` decimal(14,2) NOT NULL DEFAULT 0.00 COMMENT 'Commission Amount',
+      `Remarks` varchar(255) DEFAULT NULL,
+      `CreatedBy` int(11) DEFAULT NULL,
+      `CreatedAt` datetime NOT NULL DEFAULT current_timestamp(),
+      `UpdatedBy` int(11) DEFAULT NULL,
+      `UpdatedAt` datetime NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+      `IsActive` tinyint(1) NOT NULL DEFAULT 1,
+      `IsDeleted` tinyint(1) NOT NULL DEFAULT 0,
+      PRIMARY KEY (`Id`),
+      KEY `idx_bulk_txn_date` (`TxnDate`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Historical bulk collection entries uploaded prior to software live';";
+
+    try {
+        db()->inUpDel($sql);
+    } catch (\Throwable $e) {
+        // Table creation fallback
+    }
+}
+
+
+
+
+
 
